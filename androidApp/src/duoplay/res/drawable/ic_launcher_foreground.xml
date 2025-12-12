@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Centered design with play symbol and dual elements -->
+    <group
+        android:translateX="54"
+        android:translateY="54">
+
+        <!-- Outer circle ring (subtle) -->
+        <path
+            android:pathData="M0,0 m-28,0 a28,28 0,1,1 56,0 a28,28 0,1,1 -56,0"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="1.5"
+            android:fillColor="#00000000"/>
+
+        <!-- Inner play triangle -->
+        <path
+            android:pathData="M-6,-10 L-6,10 L12,0 Z"
+            android:fillColor="#FFFFFF"/>
+
+        <!-- Dual dots representing "duo" concept -->
+        <path
+            android:pathData="M-12,-18 m-2.5,0 a2.5,2.5 0,1,1 5,0 a2.5,2.5 0,1,1 -5,0"
+            android:fillColor="#FFFFFF"/>
+        <path
+            android:pathData="M-12,18 m-2.5,0 a2.5,2.5 0,1,1 5,0 a2.5,2.5 0,1,1 -5,0"
+            android:fillColor="#FFFFFF"/>
+    </group>
+</vector>

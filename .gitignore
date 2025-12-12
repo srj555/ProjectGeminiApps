@@ -1,0 +1,69 @@
+# Gradle files
+.gradle/
+build/
+!gradle-wrapper.jar
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# IntelliJ
+*.iml
+.idea/
+*.ipr
+*.iws
+
+# Android Studio
+.DS_Store
+/captures
+.externalNativeBuild
+.cxx
+
+# Keystore files
+*.jks
+*.keystore
+
+# Built application files
+*.apk
+*.ap_
+*.aab
+
+# Files for the Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+
+# Kotlin
+*.kt.swp
+
+# Compose
+*.compose.swp
+
+# macOS
+.DS_Store
+
+# Gradle Wrapper
+!gradle/wrapper/gradle-wrapper.jar
+
+# Version control
+.svn
+
+# Backup files
+*.bak
+*~
+
+# Log files
+*.log
+
+# Android NDK
+obj/
+.externalNativeBuild/
+
+# Misc
+*.swp
+.tmp/

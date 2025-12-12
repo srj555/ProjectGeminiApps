@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(./gradlew clean:*)",
+      "Bash(./gradlew tasks:*)",
+      "Bash(./gradlew:*)",
+      "Bash(echo:*)",
+      "Bash(if [ -d \"$HOME/Library/Android/sdk\" ])",
+      "Bash(then echo \"$HOME/Library/Android/sdk\")",
+      "Bash(elif [ -d \"/Users/$USER/Library/Android/sdk\" ])",
+      "Bash(then echo \"/Users/$USER/Library/Android/sdk\")",
+      "Bash(else echo \"Android SDK not found in standard locations\")",
+      "Bash(fi)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
