@@ -21,6 +21,9 @@ local.properties
 # Keystore files
 *.jks
 *.keystore
+keystore.properties
+AndroidRelease/keystore/CREDENTIALS.md
+AndroidRelease/builds/
 
 # Built application files
 *.apk
@@ -67,3 +70,9 @@ obj/
 # Misc
 *.swp
 .tmp/
+
+# Claude Code settings
+.claude/
+
+# Old release folders
+Release/
