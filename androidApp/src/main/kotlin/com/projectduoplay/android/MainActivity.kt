@@ -23,7 +23,10 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
 
         setContent {
-            App()
+            App(
+                appName = BuildConfig.APP_NAME,
+                appSubtitle = BuildConfig.APP_SUBTITLE
+            )
         }
 
         Analytics.logScreenView("MainActivity")

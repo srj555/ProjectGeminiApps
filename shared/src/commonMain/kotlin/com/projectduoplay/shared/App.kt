@@ -32,7 +32,10 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
-fun App() {
+fun App(
+    appName: String = "DUO PLAY",
+    appSubtitle: String = ""
+) {
     MaterialTheme(
         colorScheme = DarkColorScheme
     ) {
@@ -46,6 +49,8 @@ fun App() {
             // Show splash screen for 2 seconds
             if (!splashCompleted) {
                 SplashScreen(
+                    appName = appName,
+                    appSubtitle = appSubtitle,
                     onSplashComplete = {
                         splashCompleted = true
                     }

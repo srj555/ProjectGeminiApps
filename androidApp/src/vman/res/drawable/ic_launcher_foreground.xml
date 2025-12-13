@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- VMan ninja-themed icon design -->
+    <group
+        android:translateX="54"
+        android:translateY="54">
+
+        <!-- Outer hexagonal frame (ninja star inspired) -->
+        <path
+            android:pathData="M0,-30 L18,-15 L18,15 L0,30 L-18,15 L-18,-15 Z"
+            android:strokeColor="#DC143C"
+            android:strokeWidth="2"
+            android:fillColor="#00000000"/>
+
+        <!-- Stylized "V" letter -->
+        <path
+            android:pathData="M-15,-12 L-8,-12 L0,8 L8,-12 L15,-12 L3,16 L-3,16 Z"
+            android:fillColor="#FFFFFF"/>
+
+        <!-- Ninja mask eyes (two sharp angular shapes) -->
+        <path
+            android:pathData="M-8,-18 L-5,-18 L-3,-20 L-10,-20 Z"
+            android:fillColor="#DC143C"/>
+        <path
+            android:pathData="M8,-18 L5,-18 L3,-20 L10,-20 Z"
+            android:fillColor="#DC143C"/>
+
+        <!-- Subtle accent lines (weapon edges) -->
+        <path
+            android:pathData="M-20,20 L-16,24"
+            android:strokeColor="#DC143C"
+            android:strokeWidth="1.5"/>
+        <path
+            android:pathData="M20,20 L16,24"
+            android:strokeColor="#DC143C"
+            android:strokeWidth="1.5"/>
+    </group>
+</vector>

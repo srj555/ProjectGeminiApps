@@ -67,6 +67,7 @@ android {
 
             // Flavor-specific build config
             buildConfigField("String", "APP_NAME", "\"DuoPlay\"")
+            buildConfigField("String", "APP_SUBTITLE", "\"\"")
             buildConfigField("String", "BASE_URL", "\"https://duoplay-589720827506.us-west1.run.app\"")
             buildConfigField("boolean", "ENABLE_ANALYTICS", "true")
             buildConfigField("boolean", "ENABLE_PUSH_NOTIFICATIONS", "true")
@@ -74,6 +75,23 @@ android {
             // Resource values
             resValue("string", "app_name", "DuoPlay")
             resValue("string", "base_url", "https://duoplay-589720827506.us-west1.run.app")
+        }
+
+        create("vman") {
+            dimension = "app"
+            applicationId = "com.vman.app"
+            versionNameSuffix = "-vman"
+
+            // Flavor-specific build config
+            buildConfigField("String", "APP_NAME", "\"VMan\"")
+            buildConfigField("String", "APP_SUBTITLE", "\"Shadow of the Last Ninja\"")
+            buildConfigField("String", "BASE_URL", "\"https://v-man-shadow-of-the-last-ninja-589720827506.us-west1.run.app\"")
+            buildConfigField("boolean", "ENABLE_ANALYTICS", "true")
+            buildConfigField("boolean", "ENABLE_PUSH_NOTIFICATIONS", "true")
+
+            // Resource values
+            resValue("string", "app_name", "VMan")
+            resValue("string", "base_url", "https://v-man-shadow-of-the-last-ninja-589720827506.us-west1.run.app")
         }
 
         // Template for creating new flavors
