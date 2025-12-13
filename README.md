@@ -1,193 +1,342 @@
-# ProjectDuoPlay - KMM WebView Framework
+# ProjectGeminiApps
 
-A production-ready Kotlin Multiplatform Mobile (KMM) framework for building WebView-based applications with support for Android and iOS. Built with Clean Architecture, modular design, and product flavor support for easy white-labeling.
+A production-ready Kotlin Multiplatform Mobile (KMM) white-label WebView app framework with product flavors for rapid deployment of multiple branded applications. Built with Clean Architecture, modular design, and complete Play Store release infrastructure.
+
+## Overview
+
+This project provides a complete infrastructure for building and deploying multiple white-label Android apps from a single codebase. Each app can have its own branding, configuration, and backend URL while sharing the core functionality.
+
+**Key Features:**
+- Kotlin Multiplatform Mobile (KMM) with Compose Multiplatform
+- WebView-based apps with native Android shell (iOS ready)
+- Product flavors for easy white-labeling and multi-app support
+- Complete production release infrastructure
+- Automated build scripts and Play Store deployment guides
+- Modular Clean Architecture
+
+## Current Apps
+
+### DuoPlay - Gaming Platform
+- **Package ID**: `com.duoplay.app`
+- **Backend**: https://duoplay-589720827506.us-west1.run.app
+- **Status**: Production-ready with signed releases
+- **Version**: 1.0.0
 
 ## Features
 
+### Core Capabilities
 - **Kotlin Multiplatform Mobile (KMM)** with Compose Multiplatform
 - **Clean Architecture** with modularized layers (Core, Feature, Shared)
-- **Product Flavors** for easy white-labeling and multi-app support
 - **WebView Integration** with native Android WebView and iOS WKWebView
 - **JavaScript Bridge** for bidirectional web-native communication
 - **Deep Linking** support for both platforms
 - **Push Notifications** infrastructure (Firebase/APNs)
 - **Network Monitoring** with offline detection
 - **Analytics** integration ready
-- **Production Features**: error handling, loading states, security (SSL, safe browsing)
+- **Security**: SSL enforcement, safe browsing, domain whitelisting
+
+### Production Infrastructure
+- **Automated Release Scripts** for AAB and APK generation
+- **Keystore Management** with secure signing configuration
+- **Complete Documentation** for Play Store submission
+- **Release Checklists** for deployment process
+- **Graphics Asset Templates** and requirements
+- **ProGuard/R8** optimization for release builds
 
 ## Project Structure
 
 ```
-ProjectDuoPlay/
-├── androidApp/                    # Android application
+ProjectGeminiApps/
+├── androidApp/                    # Android application module
 │   ├── src/
-│   │   ├── main/                  # Main source set
-│   │   └── duoplay/               # DuoPlay flavor resources
-│   └── build.gradle.kts
-├── iosApp/                        # iOS application
-│   └── iosApp/
-│       ├── iOSApp.swift
-│       └── Info.plist
-├── shared/                        # Shared KMM module
-│   ├── src/
-│   │   ├── commonMain/            # Common Kotlin code
-│   │   ├── androidMain/           # Android-specific code
-│   │   └── iosMain/               # iOS-specific code
-│   └── build.gradle.kts
-├── core/                          # Core reusable modules
-│   ├── common/                    # Common utilities
-│   ├── network/                   # Network utilities
+│   │   ├── main/                  # Default source set
+│   │   └── duoplay/               # DuoPlay flavor-specific resources
+│   │       └── res/
+│   │           ├── mipmap-*/      # App icons
+│   │           └── values/        # Strings, colors, themes
+│   └── build.gradle.kts           # App build configuration with flavors
+│
+├── shared/                        # Shared KMM code
+│   └── src/
+│       ├── commonMain/            # Platform-agnostic code
+│       ├── androidMain/           # Android-specific code
+│       └── iosMain/               # iOS-specific code (ready)
+│
+├── core/                          # Core modules
+│   ├── common/                    # Common utilities, Result, Logger
+│   ├── network/                   # Network monitoring
 │   └── analytics/                 # Analytics abstraction
+│
 ├── feature/                       # Feature modules
-│   └── webview/                   # WebView feature
+│   └── webview/                   # WebView functionality & JS bridge
+│
+├── AndroidRelease/                # Production release management
+│   ├── README.md                  # Release infrastructure overview
+│   ├── RELEASE_CHECKLIST.md      # Step-by-step release guide
+│   ├── keystore/                  # App signing (gitignored)
+│   │   ├── duoplay-release.keystore (not in git)
+│   │   ├── CREDENTIALS.md        (not in git)
+│   │   └── keystore.properties.template
+│   ├── scripts/                   # Build automation
+│   │   ├── quick-release.sh       # One-command AAB build
+│   │   ├── build-release-aab.sh   # Interactive AAB builder
+│   │   ├── build-release-apk.sh   # Interactive APK builder
+│   │   └── generate-keystore.sh   # Keystore generator
+│   ├── documentation/             # Guides and specifications
+│   │   ├── PLAY_STORE_LISTING.md
+│   │   ├── PLAY_STORE_SUBMISSION_GUIDE.md
+│   │   └── GRAPHICS_ASSETS_REQUIREMENTS.md
+│   └── builds/                    # Output directory (gitignored)
+│
 └── gradle/
     └── libs.versions.toml         # Version catalog
 ```
+
+## Technologies
+
+- **Language**: Kotlin
+- **Architecture**: Kotlin Multiplatform Mobile (KMM)
+- **UI Framework**: Jetpack Compose
+- **Dependency Injection**: Koin
+- **Build System**: Gradle with Kotlin DSL
+- **Min SDK**: 24 (Android 7.0)
+- **Target SDK**: 35 (Android 15)
+- **Java Version**: 17
 
 ## Getting Started
 
 ### Prerequisites
 
 - **JDK 17** or higher
-- **Android Studio Koala** or newer
-- **Xcode 15** or higher (for iOS development)
+- **Android Studio Hedgehog (2023.1.1)** or newer
+- **Android SDK** with API 35
+- **Xcode 15+** (for iOS development)
 - **CocoaPods** (for iOS dependencies)
+- Git
 
 ### Setup
 
-1. **Clone the repository**
+1. **Clone the repository:**
    ```bash
-   cd ProjectDuoPlay
+   git clone https://github.com/srj555/ProjectGeminiApps.git
+   cd ProjectGeminiApps
    ```
 
-2. **Build the project**
+2. **Open in Android Studio:**
+   - File → Open → Select the project directory
+   - Wait for Gradle sync to complete
+
+3. **Build the project:**
    ```bash
    ./gradlew build
    ```
 
-3. **Run Android App (DuoPlay flavor)**
+4. **Run Android App (DuoPlay flavor):**
    ```bash
    ./gradlew :androidApp:installDuoplayDebug
    ```
+   Or use Android Studio:
+   - Select build variant: `duoplayDebug`
+   - Click Run ▶️
 
-4. **Run iOS App**
+5. **Run iOS App:**
    ```bash
    cd iosApp
    pod install
    open iosApp.xcworkspace
    ```
 
-## Creating a New Flavor/App
+## Creating a New App Flavor
 
-To create a new white-labeled app (e.g., "MyApp"), follow these steps:
+To create a new white-label app (e.g., "MyApp"):
 
-### Android
+### 1. Add Product Flavor
 
-1. **Edit `androidApp/build.gradle.kts`**
+Edit `androidApp/build.gradle.kts`:
 
-   Add a new product flavor:
-   ```kotlin
-   productFlavors {
-       create("myapp") {
-           dimension = "app"
-           applicationId = "com.myapp.app"
-           versionNameSuffix = "-myapp"
+```kotlin
+productFlavors {
+    create("myapp") {
+        dimension = "app"
+        applicationId = "com.myapp.app"
+        versionNameSuffix = "-myapp"
 
-           buildConfigField("String", "APP_NAME", "\"MyApp\"")
-           buildConfigField("String", "BASE_URL", "\"https://myapp.example.com\"")
-           buildConfigField("boolean", "ENABLE_ANALYTICS", "true")
-           buildConfigField("boolean", "ENABLE_PUSH_NOTIFICATIONS", "true")
+        buildConfigField("String", "APP_NAME", "\"MyApp\"")
+        buildConfigField("String", "BASE_URL", "\"https://myapp.example.com\"")
+        buildConfigField("boolean", "ENABLE_ANALYTICS", "true")
+        buildConfigField("boolean", "ENABLE_PUSH_NOTIFICATIONS", "true")
 
-           resValue("string", "app_name", "MyApp")
-           resValue("string", "base_url", "https://myapp.example.com")
-       }
-   }
-   ```
+        resValue("string", "app_name", "MyApp")
+        resValue("string", "base_url", "https://myapp.example.com")
+    }
+}
+```
 
-2. **Create flavor-specific resources**
+### 2. Create Flavor Resources
 
-   Create directory: `androidApp/src/myapp/res/values/strings.xml`
-   ```xml
-   <?xml version="1.0" encoding="utf-8"?>
-   <resources>
-       <string name="app_name">MyApp</string>
-   </resources>
-   ```
+Create directory: `androidApp/src/myapp/res/`
 
-3. **Update AndroidManifest.xml deep links**
+**Add app icon:**
+- Create: `mipmap-mdpi/`, `mipmap-hdpi/`, `mipmap-xhdpi/`, `mipmap-xxhdpi/`, `mipmap-xxxhdpi/`
+- Add: `ic_launcher.png` and `ic_launcher_round.png` in each
 
-   In `androidApp/src/main/AndroidManifest.xml`, add flavor-specific deep link filters:
-   ```xml
-   <data
-       android:scheme="https"
-       android:host="myapp.example.com" />
-   ```
+**Add colors/themes:**
+Create `values/colors.xml`:
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#FF6200EE</color>
+    <color name="primary_dark">#FF3700B3</color>
+    <color name="accent">#FF03DAC5</color>
+</resources>
+```
 
-4. **Build the flavor**
-   ```bash
-   ./gradlew :androidApp:assembleMyappRelease
-   ```
+### 3. Update Deep Links (Optional)
 
-### iOS
+In `androidApp/src/main/AndroidManifest.xml`, add flavor-specific deep link:
+```xml
+<data
+    android:scheme="https"
+    android:host="myapp.example.com" />
+```
 
-For iOS, the configuration is centralized in the shared module:
+### 4. Build and Test
 
-1. **Update `shared/src/iosMain/kotlin/com/projectduoplay/shared/KoinIOS.kt`**
+```bash
+./gradlew :androidApp:assembleMyappDebug
+./gradlew :androidApp:installMyappDebug
+```
 
-   Modify the `iosAppModule()` function to support multiple configurations:
-   ```kotlin
-   private fun iosAppModule() = module {
-       single<AppConfigProvider> {
-           object : AppConfigProvider {
-               override fun getConfig(): AppConfig {
-                   // Read from configuration or Info.plist
-                   return AppConfig(
-                       appName = "MyApp",
-                       appId = "com.myapp.app",
-                       baseUrl = "https://myapp.example.com",
-                       // ... other config
-                   )
-               }
-           }
-       }
-   }
-   ```
+## Building for Production
 
-2. **Update `iosApp/iosApp/Info.plist`**
+### Quick Release Build (Recommended)
 
-   Update bundle identifier, app name, and deep link configuration:
-   ```xml
-   <key>CFBundleDisplayName</key>
-   <string>MyApp</string>
-   <key>CFBundleURLSchemes</key>
-   <array>
-       <string>myapp</string>
-   </array>
-   ```
+```bash
+cd AndroidRelease
+./scripts/quick-release.sh
+```
+
+This will:
+1. Clean the project
+2. Build signed AAB (Android App Bundle)
+3. Copy to `AndroidRelease/builds/` with timestamp
+4. Display verification command
+
+**Output:** `AndroidRelease/builds/duoplay-v1.0.0-[timestamp].aab`
+
+### Manual Build Commands
+
+**Build AAB (for Play Store):**
+```bash
+./gradlew clean
+./gradlew :androidApp:bundleDuoplayRelease
+```
+
+**Build APK (for testing):**
+```bash
+./gradlew :androidApp:assembleDuoplayRelease
+```
+
+**Or use the scripts:**
+```bash
+./AndroidRelease/scripts/build-release-aab.sh
+./AndroidRelease/scripts/build-release-apk.sh
+```
+
+**Verify Signing:**
+```bash
+jarsigner -verify -verbose -certs AndroidRelease/builds/[file].aab
+```
+
+### iOS Release
+
+1. Open `iosApp.xcworkspace` in Xcode
+2. Select Product → Archive
+3. Follow App Store submission process
+
+## Release Management
+
+Complete release infrastructure in `AndroidRelease/` directory.
+
+### Documentation
+
+- **README.md**: Overview and quick start
+- **RELEASE_CHECKLIST.md**: Complete step-by-step release process
+- **documentation/PLAY_STORE_LISTING.md**: Store content and metadata
+- **documentation/PLAY_STORE_SUBMISSION_GUIDE.md**: Detailed submission guide
+- **documentation/GRAPHICS_ASSETS_REQUIREMENTS.md**: Asset specifications
+
+### Automated Scripts
+
+All scripts in `AndroidRelease/scripts/`:
+
+- **quick-release.sh**: One-command AAB build ⚡
+- **build-release-aab.sh**: Interactive AAB builder
+- **build-release-apk.sh**: Interactive APK builder
+- **generate-keystore.sh**: Create new keystore for app signing
+
+### Keystore Management
+
+**Generate keystore for new app:**
+```bash
+cd AndroidRelease
+./scripts/generate-keystore.sh
+```
+
+**Security Best Practices:**
+- Keystore files are gitignored for security
+- NEVER commit keystores or credentials to version control
+- Backup keystore securely (you cannot update app without it)
+- Store passwords in password manager
+- Credentials documented in `AndroidRelease/keystore/CREDENTIALS.md` (not in git)
+
+## Play Store Submission
+
+Follow the complete checklist at `AndroidRelease/RELEASE_CHECKLIST.md`
+
+### Quick Summary
+
+1. ✅ Complete development and testing
+2. 📦 Build signed AAB
+3. 🎨 Create graphics (feature graphic, screenshots)
+4. 🏪 Set up Google Play Console account ($25 one-time)
+5. 📝 Configure store listing
+6. ⭐ Complete content rating
+7. 📤 Upload AAB and submit for review (1-3 days)
+8. 🚀 Go live!
+
+### Required Assets
+
+- **Feature graphic**: 1024 × 500 px PNG/JPG
+- **Screenshots**: Minimum 2 (1080 × 2340 px recommended)
+- **Privacy policy**: Public URL required
+- **App icon**: Automatically included from AAB
+
+See `AndroidRelease/documentation/GRAPHICS_ASSETS_REQUIREMENTS.md` for complete specifications.
 
 ## Architecture
 
 ### Core Modules
 
-#### core:common
+**core:common**
 - `Result.kt` - Result wrapper for operations
 - `Logger.kt` - Platform-agnostic logging
 - `AppConfig.kt` - Application configuration
 
-#### core:network
+**core:network**
 - `NetworkMonitor.kt` - Network connectivity monitoring
-- Platform-specific implementations for Android and iOS
+- Platform-specific implementations
 
-#### core:analytics
+**core:analytics**
 - `AnalyticsTracker.kt` - Analytics abstraction
 - Platform-specific implementations
 
 ### Feature Modules
 
-#### feature:webview
+**feature:webview**
 - `WebViewController.kt` - WebView abstraction
 - `JavaScriptBridge.kt` - JS-Native bridge
-- `WebViewViewModel.kt` - WebView state management
+- `WebViewViewModel.kt` - State management
 - Platform-specific WebView implementations
 
 ## Configuration
@@ -213,7 +362,7 @@ data class AppConfig(
 
 ### JavaScript Bridge
 
-The JavaScript bridge allows bidirectional communication:
+Bidirectional communication between web and native:
 
 **From Web to Native:**
 ```javascript
@@ -238,6 +387,56 @@ javaScriptBridge.callJavaScriptFunction("onNativeEvent", "data")
 - Configure in `Info.plist`
 - URL schemes and Universal Links supported
 
+## Security Features
+
+- **SSL/TLS** enforced (no cleartext traffic)
+- **Safe Browsing** enabled
+- **Domain whitelisting** for WebView navigation
+- **ProGuard/R8** optimization for release builds
+- **JavaScript interface** security
+- **Code minification** and resource shrinking
+
+## Version Management
+
+Update in `androidApp/build.gradle.kts`:
+
+```kotlin
+defaultConfig {
+    versionCode = 1      // Increment for each release
+    versionName = "1.0.0" // Semantic versioning (MAJOR.MINOR.PATCH)
+}
+```
+
+**Version Rules:**
+- `versionCode`: Integer, must increment with each Play Store release
+- `versionName`: Display version following semantic versioning
+
+## Build Variants
+
+### Debug vs Release
+
+**Debug Build:**
+- No code minification
+- Debuggable
+- Application ID suffix: `.debug`
+- Fast build times
+- Development environment
+
+**Release Build:**
+- R8 code minification enabled
+- Resource shrinking enabled
+- Signed with release keystore
+- ProGuard rules applied
+- Optimized for distribution
+- Production environment
+
+### Available Variants
+
+- `duoplayDebug`
+- `duoplayRelease`
+
+Future flavors add more variants automatically.
+
 ## Push Notifications
 
 ### Android (Firebase Cloud Messaging)
@@ -253,32 +452,6 @@ javaScriptBridge.callJavaScriptFunction("onNativeEvent", "data")
 2. Configure in `Info.plist`
 3. Implement in `PushNotificationManager.swift`
 
-## Security Features
-
-- **SSL/TLS** enforced (no cleartext traffic)
-- **Safe Browsing** enabled
-- **Domain whitelisting** for WebView navigation
-- **ProGuard** rules for Android release builds
-- **JavaScript interface** security
-
-## Building for Production
-
-### Android
-
-```bash
-# Build release APK for specific flavor
-./gradlew :androidApp:assembleDuoplayRelease
-
-# Build release AAB for Google Play
-./gradlew :androidApp:bundleDuoplayRelease
-```
-
-### iOS
-
-1. Open `iosApp.xcworkspace` in Xcode
-2. Select Product > Archive
-3. Follow App Store submission process
-
 ## Testing
 
 ```bash
@@ -288,38 +461,111 @@ javaScriptBridge.callJavaScriptFunction("onNativeEvent", "data")
 # Run iOS tests
 cd iosApp
 xcodebuild test -workspace iosApp.xcworkspace -scheme iosApp
+
+# Run specific flavor tests
+./gradlew :androidApp:testDuoplayDebugUnitTest
 ```
 
 ## Troubleshooting
 
-### Common Issues
+### Build Issues
 
-1. **CocoaPods issues**
-   ```bash
-   cd iosApp
-   pod deintegrate
-   pod install
-   ```
+**"Keystore not found"**
+- Ensure `keystore.properties` exists in project root
+- Verify paths in `keystore.properties` are correct
+- Run `AndroidRelease/scripts/generate-keystore.sh` if needed
 
-2. **Gradle sync issues**
-   ```bash
-   ./gradlew clean
-   ./gradlew --stop
-   ```
+**Gradle sync fails**
+- Update Android Studio to latest version
+- Invalidate caches: File → Invalidate Caches → Invalidate and Restart
+- Check JDK version is 17+
+- Run `./gradlew clean`
 
-3. **WebView not loading**
-   - Check network permissions
-   - Verify URL is accessible
-   - Check domain whitelist configuration
+**App crashes on startup**
+- Check WebView URL is accessible
+- Verify internet permissions in AndroidManifest.xml
+- Check logcat for specific errors
+- Verify BASE_URL configuration
 
-## License
+### iOS Issues
 
-Copyright © 2024. All rights reserved.
+**CocoaPods issues**
+```bash
+cd iosApp
+pod deintegrate
+pod install
+```
+
+**WebView not loading**
+- Check network permissions
+- Verify URL is accessible
+- Check domain whitelist configuration
+- Review App Transport Security settings
+
+## Dependencies
+
+Key libraries:
+- **Jetpack Compose**: Modern UI toolkit
+- **Koin**: Dependency injection
+- **Kotlin Coroutines**: Asynchronous programming
+- **AndroidX Libraries**: Core Android components
+
+See `gradle/libs.versions.toml` for complete dependency list.
+
+## Security
+
+### Protected (gitignored)
+
+- `*.keystore`, `*.jks` - Signing keystores
+- `keystore.properties` - Keystore credentials
+- `AndroidRelease/keystore/CREDENTIALS.md` - Passwords
+- `AndroidRelease/builds/` - Built APK/AAB files
+- `.claude/` - Local development settings
+- `Release/` - Old release folders
+
+### Never Commit
+
+- API keys or secrets
+- Keystore files or passwords
+- Personal data or credentials
+- Large binary files
+- `google-services.json` (Firebase config)
 
 ## Contributing
 
-This is a proprietary project template. Customize as needed for your applications.
+This is a private project framework. For team members:
+
+1. Create a feature branch
+2. Make your changes
+3. Test thoroughly (debug and release builds)
+4. Create pull request
+5. Code review required before merge
 
 ## Support
 
-For issues and questions, please contact the development team.
+- **Documentation**: `AndroidRelease/documentation/`
+- **Issues**: https://github.com/srj555/ProjectGeminiApps/issues
+- **Play Console**: https://play.google.com/console
+- **Developer Support**: https://support.google.com/googleplay/android-developer
+
+## License
+
+Proprietary - All rights reserved
+
+## Changelog
+
+### Version 1.0.0 (December 2024)
+- ✅ KMM WebView framework with Clean Architecture
+- ✅ DuoPlay app implementation
+- ✅ Product flavor architecture for white-labeling
+- ✅ Complete release infrastructure and automation
+- ✅ Play Store deployment documentation and guides
+- ✅ Automated build scripts (AAB/APK)
+- ✅ Keystore management and signing configuration
+- ✅ Security best practices and ProGuard rules
+
+---
+
+**Built with ❤️ using Kotlin Multiplatform Mobile**
+
+🚀 Ready to deploy multiple apps from a single codebase!
