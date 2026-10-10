@@ -17,13 +17,17 @@ class AndroidAppConfigProvider(
     override fun getConfig(): AppConfig {
         return AppConfig(
             appName = BuildConfig.APP_NAME,
+            appSubtitle = BuildConfig.APP_SUBTITLE,
             appId = BuildConfig.APPLICATION_ID,
             baseUrl = BuildConfig.BASE_URL,
             enableAnalytics = BuildConfig.ENABLE_ANALYTICS,
             enablePushNotifications = BuildConfig.ENABLE_PUSH_NOTIFICATIONS,
             enableDeepLinking = true,
-            enableJavaScriptBridge = true,
-            allowedDomains = extractDomainsFromUrl(BuildConfig.BASE_URL),
+            enableJavaScriptBridge = BuildConfig.ENABLE_JAVASCRIPT_BRIDGE,
+            allowedOrigins = BuildConfig.ALLOWED_ORIGINS
+                .split('|')
+                .map(String::trim)
+                .filter(String::isNotEmpty),
             customUserAgent = "${BuildConfig.APP_NAME}/${BuildConfig.VERSION_NAME}",
             theme = AppTheme(
                 primaryColor = "#6200EE",
@@ -33,12 +37,4 @@ class AndroidAppConfigProvider(
         )
     }
 
-    private fun extractDomainsFromUrl(url: String): List<String> {
-        return try {
-            val uri = android.net.Uri.parse(url)
-            listOfNotNull(uri.host)
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
 }

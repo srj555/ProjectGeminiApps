@@ -9,6 +9,7 @@ import com.projectduoplay.core.network.NetworkStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class WebViewViewModel(
@@ -23,30 +24,43 @@ class WebViewViewModel(
     val networkStatus: StateFlow<NetworkStatus> = _networkStatus.asStateFlow()
 
     private lateinit var webViewController: WebViewController
-    private lateinit var javaScriptBridge: JavaScriptBridge
+    private var javaScriptBridge: JavaScriptBridge? = null
+    private var webViewStateJob: Job? = null
+    private var pendingDeepLink: String? = null
+    private var networkMonitoringStarted = false
 
     val webViewConfig = WebViewConfig(
         initialUrl = appConfig.baseUrl,
-        allowedDomains = appConfig.allowedDomains,
+        allowedOrigins = appConfig.allowedOrigins,
         enableJavaScript = true,
+        enableJavaScriptBridge = appConfig.enableJavaScriptBridge,
         enableDomStorage = true,
         userAgentSuffix = appConfig.customUserAgent,
         javaScriptBridgeName = "NativeBridge"
     )
 
     init {
+        networkMonitoringStarted = runCatching {
+            networkMonitor.startMonitoring()
+            true
+        }.getOrDefault(false)
         observeNetworkStatus()
     }
 
     fun initializeWebView(controller: WebViewController) {
+        if (::webViewController.isInitialized && webViewController === controller) return
+
         webViewController = controller
 
         if (appConfig.enableJavaScriptBridge) {
             javaScriptBridge = JavaScriptBridge(controller)
+        } else {
+            javaScriptBridge = null
         }
 
         observeWebViewState()
-        loadInitialUrl()
+        controller.loadUrl(pendingDeepLink ?: appConfig.baseUrl)
+        pendingDeepLink = null
     }
 
     private fun observeNetworkStatus() {
@@ -58,13 +72,22 @@ class WebViewViewModel(
                         "No internet connection",
                         isNetworkError = true
                     )
+                } else if (
+                    status == NetworkStatus.AVAILABLE &&
+                    (_uiState.value as? WebViewUiState.Error)?.isNetworkError == true
+                ) {
+                    _uiState.value = WebViewUiState.Loading
+                    if (::webViewController.isInitialized) {
+                        webViewController.reload()
+                    }
                 }
             }
         }
     }
 
     private fun observeWebViewState() {
-        viewModelScope.launch {
+        webViewStateJob?.cancel()
+        webViewStateJob = viewModelScope.launch {
             webViewController.loadingState.collect { state ->
                 when (state) {
                     is WebViewLoadingState.Idle -> {
@@ -89,28 +112,36 @@ class WebViewViewModel(
         }
     }
 
-    private fun loadInitialUrl() {
-        webViewController.loadUrl(appConfig.baseUrl)
-    }
-
     fun reload() {
-        webViewController.reload()
+        if (::webViewController.isInitialized) {
+            webViewController.reload()
+        }
     }
 
     fun goBack() {
-        if (webViewController.canGoBack.value) {
+        if (::webViewController.isInitialized && webViewController.canGoBack.value) {
             webViewController.goBack()
         }
     }
 
     fun handleDeepLink(url: String) {
         Analytics.logDeepLink(url)
-        webViewController.loadUrl(url)
+        if (::webViewController.isInitialized) {
+            webViewController.loadUrl(url)
+        } else {
+            pendingDeepLink = url
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
-        networkMonitor.stopMonitoring()
+        webViewStateJob?.cancel()
+        if (::webViewController.isInitialized) {
+            webViewController.dispose()
+        }
+        if (networkMonitoringStarted) {
+            runCatching { networkMonitor.stopMonitoring() }
+        }
     }
 }
 

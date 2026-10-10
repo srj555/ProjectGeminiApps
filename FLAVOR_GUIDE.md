@@ -1,335 +1,71 @@
-# Product Flavor Creation Guide
+# App profile guide
 
-This guide walks you through creating a new white-labeled app from the ProjectDuoPlay framework.
+Each app is a TOML document under `profiles/`. Do not add Gradle product-flavor blocks or hardcode a second iOS configuration.
 
-## Overview
+## Required fields
 
-The framework is designed to support multiple white-labeled apps (flavors) from a single codebase. Each flavor can have:
-- Unique app name and branding
-- Different WebView URL
-- Custom configuration
-- Separate app IDs for app stores
+- `id`: lowercase generator key (`[a-z][a-z0-9_]*`)
+- `display_name`, `subtitle`: user-facing branding
+- `start_url`: absolute HTTPS URL whose origin is in `allowed_origins`
+- `allowed_origins`: exact canonical HTTPS origins; no path, query, fragment, credentials, or wildcard
+- `icon`: relative path inside `profiles/` to an opaque 1024×1024 PNG
+- `version_name`: SemVer
+- `version_code`: positive integer used for Android and iOS build versions
+- `required_capabilities`: only capabilities the runtime actually supports
+- Android `application_id`
+- iOS `bundle_id`, `scheme`, `url_scheme`, and `associated_domain`
 
-## Step-by-Step Guide
+Supported capability declarations in schema v1 are `external_navigation`, `web_history`, `offline_retry`, and `persistent_session`.
 
-### 1. Android Flavor Setup
+Requests for OAuth specialization, uploads/downloads, camera, microphone, push, analytics, or a native JavaScript API require implementation and review before they can be declared.
 
-#### 1.1 Add Product Flavor
+## Onboarding workflow
 
-Edit `androidApp/build.gradle.kts` and add your flavor in the `productFlavors` block:
-
-```kotlin
-create("yourapp") {
-    dimension = "app"
-    applicationId = "com.yourcompany.yourapp"
-    versionNameSuffix = "-yourapp"
-
-    // Build config fields
-    buildConfigField("String", "APP_NAME", "\"YourApp\"")
-    buildConfigField("String", "BASE_URL", "\"https://yourapp.example.com\"")
-    buildConfigField("boolean", "ENABLE_ANALYTICS", "true")
-    buildConfigField("boolean", "ENABLE_PUSH_NOTIFICATIONS", "true")
-
-    // Resource values
-    resValue("string", "app_name", "YourApp")
-    resValue("string", "base_url", "https://yourapp.example.com")
-}
-```
-
-#### 1.2 Create Flavor Resources
-
-Create the following directory structure:
-```
-androidApp/src/yourapp/res/
-└── values/
-    └── strings.xml
-```
-
-`androidApp/src/yourapp/res/values/strings.xml`:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">YourApp</string>
-</resources>
-```
-
-#### 1.3 Add App Icons (Optional)
-
-Place app icons in flavor-specific directories:
-```
-androidApp/src/yourapp/res/
-├── mipmap-hdpi/
-├── mipmap-mdpi/
-├── mipmap-xhdpi/
-├── mipmap-xxhdpi/
-└── mipmap-xxxhdpi/
-```
-
-#### 1.4 Configure Deep Links
-
-Update `androidApp/src/main/AndroidManifest.xml` to add flavor-specific deep links:
-
-```xml
-<!-- In the MainActivity intent-filter -->
-<data
-    android:scheme="https"
-    android:host="yourapp.example.com" />
-```
-
-Or create a flavor-specific manifest:
-`androidApp/src/yourapp/AndroidManifest.xml`:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
-        <activity android:name=".MainActivity">
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="yourapp.example.com" />
-            </intent-filter>
-        </activity>
-    </application>
-</manifest>
-```
-
-### 2. iOS Configuration
-
-#### 2.1 Update Shared Module
-
-Edit `shared/src/iosMain/kotlin/com/projectduoplay/shared/KoinIOS.kt`:
-
-```kotlin
-private fun iosAppModule() = module {
-    single<AppConfigProvider> {
-        object : AppConfigProvider {
-            override fun getConfig(): AppConfig {
-                return AppConfig(
-                    appName = "YourApp",
-                    appId = "com.yourcompany.yourapp",
-                    baseUrl = "https://yourapp.example.com",
-                    enableAnalytics = true,
-                    enablePushNotifications = true,
-                    enableDeepLinking = true,
-                    enableJavaScriptBridge = true,
-                    allowedDomains = listOf("yourapp.example.com"),
-                    customUserAgent = "YourApp/1.0.0",
-                    theme = AppTheme(
-                        primaryColor = "#YOUR_COLOR",
-                        splashScreenBackground = "#FFFFFF",
-                        statusBarColor = "#YOUR_COLOR"
-                    )
-                )
-            }
-        }
-    }
-}
-```
-
-#### 2.2 Update Info.plist
-
-Edit `iosApp/iosApp/Info.plist`:
-
-```xml
-<key>CFBundleDisplayName</key>
-<string>YourApp</string>
-
-<key>CFBundleIdentifier</key>
-<string>com.yourcompany.yourapp</string>
-
-<!-- Deep Link Support -->
-<key>CFBundleURLTypes</key>
-<array>
-    <dict>
-        <key>CFBundleTypeRole</key>
-        <string>Editor</string>
-        <key>CFBundleURLName</key>
-        <string>com.yourcompany.yourapp</string>
-        <key>CFBundleURLSchemes</key>
-        <array>
-            <string>yourapp</string>
-        </array>
-    </dict>
-</array>
-
-<!-- Universal Links -->
-<key>com.apple.developer.associated-domains</key>
-<array>
-    <string>applinks:yourapp.example.com</string>
-</array>
-```
-
-#### 2.3 Update Xcode Project
-
-1. Open `iosApp.xcworkspace` in Xcode
-2. Select the project in Project Navigator
-3. Update:
-   - **Bundle Identifier**: `com.yourcompany.yourapp`
-   - **Display Name**: `YourApp`
-   - **Version**: `1.0`
-   - **Build**: `1`
-
-### 3. Build and Test
-
-#### Android
+1. Copy an existing TOML file and icon.
+2. Replace every identity, scheme, domain, URL, name, and icon reference.
+3. Validate all profiles together so collisions are detected.
+4. Generate both platforms.
+5. Build both debug artifacts.
+6. Install both the old and new app together to prove identifiers do not collide.
+7. Test startup, allowed navigation, disallowed/external navigation, Android system back, offline/reconnect, authentication/session persistence, and site-specific input on real devices.
+8. Configure signing outside the repository.
+9. Complete store, privacy, legal, and website-association checks.
 
 ```bash
-# Debug build
-./gradlew :androidApp:assembleYourappDebug
-
-# Release build
-./gradlew :androidApp:assembleYourappRelease
-
-# Install on device
-./gradlew :androidApp:installYourappDebug
+./wrapper validate --profile all
+./wrapper generate --profile example --platform all
+./wrapper build --profile example --platform android --configuration debug --artifact apk
+./wrapper build --profile example --platform ios --configuration debug --artifact simulator-app
 ```
 
-#### iOS
+The A→B→A and concurrent generator tests guard against stale or cross-profile output:
 
-1. Open `iosApp.xcworkspace`
-2. Select your scheme
-3. Build and run (Cmd + R)
-
-### 4. Customization Options
-
-#### Theme Customization
-
-Update `AppTheme` in your config:
-
-```kotlin
-AppTheme(
-    primaryColor = "#6200EE",          // Primary brand color
-    splashScreenBackground = "#FFFFFF", // Splash screen background
-    statusBarColor = "#6200EE"         // Status bar color
-)
+```bash
+python3 -m unittest tools.tests.test_wrapper.GeneratorIntegrationTest -v
 ```
 
-#### Feature Toggles
+## Release gates
 
-Control features per flavor:
+### Android
 
-```kotlin
-AppConfig(
-    enableAnalytics = true,              // Firebase Analytics
-    enablePushNotifications = true,      // Push notifications
-    enableDeepLinking = true,            // Deep link support
-    enableJavaScriptBridge = true,       // JS-Native bridge
-    allowedDomains = listOf("..."),      // Restrict navigation
-)
-```
+- Supply an ignored `keystore.properties` file and keystore using the existing local release-signing convention.
+- Build `apk` for device testing and `aab` for Play distribution.
+- Verify the packaged application ID/version and test the release build.
+- Complete Play target-SDK, data-safety, content-rating, privacy-policy, and account requirements.
 
-#### WebView Settings
+### iOS
 
-Customize WebView behavior in `WebViewConfig`:
+- Use `simulator-app` only for simulator testing.
+- An unsigned `xcarchive` proves a device archive can be assembled but cannot be installed or submitted.
+- Configure an Apple team, certificate/profile management, capabilities, and export options before producing an IPA.
+- Verify bundle ID/version/entitlements and test an Apple-signed build on a physical device.
+- Complete App Store privacy, export compliance, review, and account requirements.
 
-```kotlin
-WebViewConfig(
-    initialUrl = "https://yourapp.example.com",
-    allowedDomains = listOf("yourapp.example.com"),
-    enableJavaScript = true,
-    enableDomStorage = true,
-    enableCache = true,
-    enableZoom = false,
-    userAgentSuffix = "YourApp/1.0.0"
-)
-```
+### Website
 
-### 5. Advanced: Multi-Environment Support
+- Confirm the site is mobile-ready in both Android System WebView and iOS WKWebView.
+- Host App/Universal Link association files for the exact identifiers.
+- Confirm authentication providers allow embedded user agents or intentionally open system browser flows.
+- Test cookies, local storage, redirects, service workers, downloads/uploads, external links, viewport/safe areas, keyboard behavior, and offline recovery.
 
-For staging/production environments, extend flavors:
-
-```kotlin
-productFlavors {
-    create("yourappStaging") {
-        dimension = "app"
-        applicationId = "com.yourcompany.yourapp.staging"
-        buildConfigField("String", "BASE_URL", "\"https://staging.yourapp.example.com\"")
-        resValue("string", "app_name", "YourApp Staging")
-    }
-
-    create("yourappProduction") {
-        dimension = "app"
-        applicationId = "com.yourcompany.yourapp"
-        buildConfigField("String", "BASE_URL", "\"https://yourapp.example.com\"")
-        resValue("string", "app_name", "YourApp")
-    }
-}
-```
-
-### 6. Checklist
-
-Before releasing a new flavor:
-
-- [ ] Unique `applicationId`/Bundle ID
-- [ ] App name configured
-- [ ] Base URL set correctly
-- [ ] App icons added
-- [ ] Deep links configured
-- [ ] Push notification certificates (iOS)
-- [ ] google-services.json (Android, if using Firebase)
-- [ ] GoogleService-Info.plist (iOS, if using Firebase)
-- [ ] Domain whitelisting configured
-- [ ] Analytics tracking ID
-- [ ] Test deep linking
-- [ ] Test push notifications
-- [ ] Test JavaScript bridge
-- [ ] Production signing keys configured
-
-## Maintenance
-
-### Adding a Feature to All Flavors
-
-Since core functionality is shared, adding features to the shared/core modules automatically applies to all flavors.
-
-### Flavor-Specific Features
-
-To add flavor-specific code:
-
-1. Create flavor source sets:
-   ```
-   androidApp/src/yourapp/kotlin/...
-   ```
-
-2. Add flavor-specific implementations
-
-### Removing a Flavor
-
-1. Remove from `productFlavors` block in `build.gradle.kts`
-2. Delete flavor resource directories
-3. Sync Gradle
-
-## Best Practices
-
-1. **Consistent Naming**: Use lowercase for flavor names in Gradle
-2. **Resource Separation**: Keep flavor-specific resources in flavor directories
-3. **Testing**: Test each flavor independently before release
-4. **Version Control**: Use branches or tags for flavor-specific releases
-5. **Documentation**: Document flavor-specific configurations
-
-## Troubleshooting
-
-### Flavor not appearing in Build Variants
-
-- Sync Gradle
-- Invalidate caches and restart Android Studio
-
-### Build conflicts between flavors
-
-- Ensure unique `applicationId` for each flavor
-- Check for conflicting resources
-
-### Deep links not working
-
-- Verify `AndroidManifest.xml` configuration
-- Test with `adb shell am start -a android.intent.action.VIEW -d "https://yourapp.example.com"`
-- Check domain verification
-
-## Examples
-
-See the `duoplay` flavor as a reference implementation:
-- `androidApp/build.gradle.kts` - Flavor configuration
-- `androidApp/src/duoplay/` - Flavor resources
-- `shared/src/iosMain/kotlin/com/projectduoplay/shared/KoinIOS.kt` - iOS config
+Do not mark a profile production-ready solely because debug builds compile.

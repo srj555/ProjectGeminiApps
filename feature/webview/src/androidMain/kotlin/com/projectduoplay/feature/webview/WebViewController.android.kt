@@ -1,7 +1,10 @@
 package com.projectduoplay.feature.webview
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
+import android.os.Build
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -30,6 +33,7 @@ actual class PlatformWebViewController actual constructor(
 
     private var messageHandler: ((JavaScriptMessage) -> Unit)? = null
     private var webView: WebView? = null
+    private val navigationPolicy = NavigationPolicy(config.allowedOrigins)
 
     @SuppressLint("SetJavaScriptEnabled")
     fun setupWebView(webView: WebView) {
@@ -37,7 +41,9 @@ actual class PlatformWebViewController actual constructor(
 
         webView.settings.apply {
             javaScriptEnabled = config.enableJavaScript
+            javaScriptCanOpenWindowsAutomatically = false
             domStorageEnabled = config.enableDomStorage
+            setSupportMultipleWindows(false)
             setSupportZoom(config.enableZoom)
             builtInZoomControls = config.enableZoom
             displayZoomControls = false
@@ -53,6 +59,9 @@ actual class PlatformWebViewController actual constructor(
             allowContentAccess = false
             allowFileAccessFromFileURLs = false
             allowUniversalAccessFromFileURLs = false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                safeBrowsingEnabled = config.enableSafeBrowsing
+            }
 
             // Mixed content
             mixedContentMode = when (config.mixedContentMode) {
@@ -73,7 +82,7 @@ actual class PlatformWebViewController actual constructor(
         webView.webChromeClient = createWebChromeClient()
 
         // Add JavaScript interface for bridge
-        if (config.enableJavaScript) {
+        if (config.enableJavaScript && config.enableJavaScriptBridge) {
             webView.addJavascriptInterface(
                 JavaScriptBridgeInterface(),
                 config.javaScriptBridgeName
@@ -119,19 +128,16 @@ actual class PlatformWebViewController actual constructor(
             request: WebResourceRequest?
         ): Boolean {
             val url = request?.url?.toString() ?: return false
+            if (request.isForMainFrame.not()) return false
 
-            // Check if URL is in allowed domains
-            if (config.allowedDomains.isNotEmpty()) {
-                val isAllowed = config.allowedDomains.any { domain ->
-                    url.contains(domain)
+            return when (navigationPolicy.decide(url)) {
+                NavigationDecision.ALLOW_IN_WEB_VIEW -> false
+                NavigationDecision.OPEN_EXTERNALLY -> {
+                    openExternal(view, url)
+                    true
                 }
-                if (!isAllowed) {
-                    // Open in external browser or handle differently
-                    return true
-                }
+                NavigationDecision.BLOCK -> true
             }
-
-            return false
         }
     }
 
@@ -152,7 +158,15 @@ actual class PlatformWebViewController actual constructor(
     }
 
     override fun loadUrl(url: String) {
-        webView?.loadUrl(url)
+        if (navigationPolicy.decide(url) == NavigationDecision.ALLOW_IN_WEB_VIEW) {
+            webView?.loadUrl(url)
+        } else {
+            _loadingState.value = WebViewLoadingState.Error(
+                errorCode = ERROR_BLOCKED_NAVIGATION,
+                description = "This link is not allowed inside the app.",
+                failingUrl = url
+            )
+        }
     }
 
     override fun reload() {
@@ -181,11 +195,38 @@ actual class PlatformWebViewController actual constructor(
         webView?.clearCache(true)
     }
 
+    override fun dispose() {
+        webView?.apply {
+            stopLoading()
+            removeJavascriptInterface(config.javaScriptBridgeName)
+            webChromeClient = WebChromeClient()
+            webViewClient = WebViewClient()
+            destroy()
+        }
+        webView = null
+        messageHandler = null
+    }
+
+    private fun openExternal(view: WebView?, url: String) {
+        val context = view?.context ?: return
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            )
+        }
+    }
+
     inner class JavaScriptBridgeInterface {
         @JavascriptInterface
         fun postMessage(name: String, data: String) {
             messageHandler?.invoke(JavaScriptMessage(name, data))
         }
+    }
+
+    private companion object {
+        const val ERROR_BLOCKED_NAVIGATION = -1000
     }
 }
 

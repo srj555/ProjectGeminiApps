@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>DuoPlay</string>
+    <string>$(APP_NAME)</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -17,9 +17,11 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>UIApplicationSceneManifest</key>
@@ -29,10 +31,6 @@
     </dict>
     <key>UILaunchScreen</key>
     <dict/>
-    <key>UIRequiredDeviceCapabilities</key>
-    <array>
-        <string>armv7</string>
-    </array>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
@@ -61,18 +59,24 @@
             <key>CFBundleTypeRole</key>
             <string>Editor</string>
             <key>CFBundleURLName</key>
-            <string>com.duoplay.app</string>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>duoplay</string>
+                <string>$(APP_URL_SCHEME)</string>
             </array>
         </dict>
     </array>
 
-    <!-- Universal Links -->
-    <key>com.apple.developer.associated-domains</key>
-    <array>
-        <string>applinks:duoplay-589720827506.us-west1.run.app</string>
-    </array>
+    <!-- Shared app profile populated by the active xcconfig. -->
+    <key>AppName</key>
+    <string>$(APP_NAME)</string>
+    <key>AppSubtitle</key>
+    <string>$(APP_SUBTITLE)</string>
+    <key>AppStartURL</key>
+    <string>$(APP_START_URL)</string>
+    <key>AppAllowedOrigins</key>
+    <string>$(APP_ALLOWED_ORIGINS)</string>
+    <key>AppEnableJavaScriptBridge</key>
+    <string>$(APP_ENABLE_JAVASCRIPT_BRIDGE)</string>
 </dict>
 </plist>

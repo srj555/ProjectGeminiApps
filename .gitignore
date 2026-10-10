@@ -29,6 +29,20 @@ AndroidRelease/builds/
 *.apk
 *.ap_
 *.aab
+/dist/
+/.build/
+/evidence/
+
+# Generated profile and iOS project outputs
+/config/generated/
+/iosApp/Config/Generated/
+/iosApp/ProjectGeminiApps.xcodeproj/
+/iosApp/ProjectGeminiApps.xcworkspace/
+/iosApp/Pods/
+/iosApp/Podfile
+/iosApp/Podfile.lock
+/iosApp/project.yml
+/iosApp/iosApp/Assets.xcassets/*AppIcon.appiconset/
 
 # Files for the Dalvik VM
 *.dex

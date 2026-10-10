@@ -10,12 +10,13 @@ import platform.Foundation.NSURLRequest
 import platform.WebKit.WKNavigation
 import platform.WebKit.WKNavigationAction
 import platform.WebKit.WKNavigationActionPolicy
-import platform.WebKit.WKNavigationDelegate
+import platform.WebKit.WKNavigationDelegateProtocol
 import platform.WebKit.WKScriptMessage
-import platform.WebKit.WKScriptMessageHandler
+import platform.WebKit.WKScriptMessageHandlerProtocol
 import platform.WebKit.WKUserContentController
 import platform.WebKit.WKWebView
 import platform.WebKit.WKWebViewConfiguration
+import platform.UIKit.UIApplication
 import platform.darwin.NSObject
 
 @OptIn(ExperimentalForeignApi::class)
@@ -36,6 +37,8 @@ actual class PlatformWebViewController actual constructor(
     override val canGoForward: StateFlow<Boolean> = _canGoForward.asStateFlow()
 
     private var messageHandler: ((JavaScriptMessage) -> Unit)? = null
+    private var scriptMessageHandler: WKScriptMessageHandlerProtocol? = null
+    private val navigationPolicy = NavigationPolicy(config.allowedOrigins)
     var webView: WKWebView? = null
         private set
 
@@ -45,29 +48,33 @@ actual class PlatformWebViewController actual constructor(
         // Configure user content controller for JavaScript bridge
         val userContentController = WKUserContentController()
 
-        // Add message handler for JavaScript bridge
-        val scriptMessageHandler = object : NSObject(), WKScriptMessageHandler {
-            override fun userContentController(
-                userContentController: WKUserContentController,
-                didReceiveScriptMessage: WKScriptMessage
-            ) {
-                val name = didReceiveScriptMessage.name
-                val body = didReceiveScriptMessage.body.toString()
-                messageHandler?.invoke(JavaScriptMessage(name, body))
+        if (config.enableJavaScript && config.enableJavaScriptBridge) {
+            scriptMessageHandler = object : NSObject(), WKScriptMessageHandlerProtocol {
+                override fun userContentController(
+                    userContentController: WKUserContentController,
+                    didReceiveScriptMessage: WKScriptMessage
+                ) {
+                    val name = didReceiveScriptMessage.name
+                    val body = didReceiveScriptMessage.body.toString()
+                    messageHandler?.invoke(JavaScriptMessage(name, body))
+                }
             }
-        }
 
-        userContentController.addScriptMessageHandler(
-            scriptMessageHandler,
-            config.javaScriptBridgeName
-        )
+            userContentController.addScriptMessageHandler(
+                scriptMessageHandler!!,
+                config.javaScriptBridgeName
+            )
+        }
 
         configuration.userContentController = userContentController
         configuration.allowsInlineMediaPlayback = true
 
-        val webView = WKWebView(frame = platform.CoreGraphics.CGRectZero, configuration = configuration)
+        val webView = WKWebView(
+            frame = platform.CoreGraphics.CGRectMake(0.0, 0.0, 0.0, 0.0),
+            configuration = configuration
+        )
 
-        webView.navigationDelegate = object : NSObject(), WKNavigationDelegate {
+        webView.navigationDelegate = object : NSObject(), WKNavigationDelegateProtocol {
             override fun webView(
                 webView: WKWebView,
                 didStartProvisionalNavigation: WKNavigation?
@@ -107,18 +114,23 @@ actual class PlatformWebViewController actual constructor(
             ) {
                 val url = decidePolicyForNavigationAction.request.URL?.absoluteString ?: ""
 
-                // Check if URL is in allowed domains
-                if (config.allowedDomains.isNotEmpty()) {
-                    val isAllowed = config.allowedDomains.any { domain ->
-                        url.contains(domain)
+                when (navigationPolicy.decide(url)) {
+                    NavigationDecision.ALLOW_IN_WEB_VIEW -> {
+                        if (decidePolicyForNavigationAction.targetFrame == null) {
+                            webView.loadRequest(decidePolicyForNavigationAction.request)
+                            decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyCancel)
+                        } else {
+                            decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyAllow)
+                        }
                     }
-                    if (!isAllowed) {
+                    NavigationDecision.OPEN_EXTERNALLY -> {
+                        openExternal(url)
                         decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyCancel)
-                        return
+                    }
+                    NavigationDecision.BLOCK -> {
+                        decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyCancel)
                     }
                 }
-
-                decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyAllow)
             }
         }
 
@@ -139,6 +151,14 @@ actual class PlatformWebViewController actual constructor(
     }
 
     override fun loadUrl(url: String) {
+        if (navigationPolicy.decide(url) != NavigationDecision.ALLOW_IN_WEB_VIEW) {
+            _loadingState.value = WebViewLoadingState.Error(
+                errorCode = ERROR_BLOCKED_NAVIGATION,
+                description = "This link is not allowed inside the app.",
+                failingUrl = url
+            )
+            return
+        }
         NSURL.URLWithString(url)?.let { nsUrl ->
             val request = NSURLRequest.requestWithURL(nsUrl)
             webView?.loadRequest(request)
@@ -170,6 +190,24 @@ actual class PlatformWebViewController actual constructor(
     override fun clearCache() {
         // iOS WebView cache clearing would go here
         // WKWebsiteDataStore.defaultDataStore().removeDataOfTypes(...)
+    }
+
+    override fun dispose() {
+        webView?.stopLoading()
+        webView?.navigationDelegate = null
+        webView?.configuration?.userContentController
+            ?.removeScriptMessageHandlerForName(config.javaScriptBridgeName)
+        webView = null
+        scriptMessageHandler = null
+        messageHandler = null
+    }
+
+    private fun openExternal(url: String) {
+        NSURL.URLWithString(url)?.let { UIApplication.sharedApplication.openURL(it) }
+    }
+
+    private companion object {
+        const val ERROR_BLOCKED_NAVIGATION = -1000
     }
 }
 

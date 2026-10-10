@@ -49,6 +49,7 @@ interface WebViewController {
     fun evaluateJavaScript(script: String, callback: ((String?) -> Unit)? = null)
     fun setJavaScriptMessageHandler(handler: (JavaScriptMessage) -> Unit)
     fun clearCache()
+    fun dispose()
 }
 
 /**

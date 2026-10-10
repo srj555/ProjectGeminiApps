@@ -16,7 +16,7 @@ actual fun WebViewContainer(
     modifier: Modifier
 ) {
     val context = LocalContext.current
-    val webView = remember {
+    val webView = remember(controller) {
         WebView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -27,12 +27,12 @@ actual fun WebViewContainer(
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(controller) {
         if (controller is PlatformWebViewController) {
             controller.setupWebView(webView)
         }
         onDispose {
-            webView.destroy()
+            controller.dispose()
         }
     }
 

@@ -1,0 +1,60 @@
+name: Wrapper CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - "codex/**"
+
+jobs:
+  profile-and-policy-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: ./wrapper validate --profile all
+      - run: python3 -m unittest discover -s tools/tests -v
+      - run: ./wrapper generate --profile all --platform android
+      - run: ./gradlew --no-parallel -PappProfile=duoplay :feature:webview:testDebugUnitTest
+
+  android-debug:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        profile: [duoplay, vman]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - run: ./wrapper build --profile "${{ matrix.profile }}" --platform android --configuration debug --artifact apk
+
+  ios-simulator:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        profile: [duoplay, vman]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: brew install xcodegen
+      - run: gem install cocoapods
+      - run: ./wrapper build --profile "${{ matrix.profile }}" --platform ios --configuration debug --artifact simulator-app

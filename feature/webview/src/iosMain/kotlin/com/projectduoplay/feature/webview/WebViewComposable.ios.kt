@@ -13,11 +13,11 @@ actual fun WebViewContainer(
     controller: WebViewController,
     modifier: Modifier
 ) {
-    val platformController = remember { controller as PlatformWebViewController }
+    val platformController = remember(controller) { controller as PlatformWebViewController }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(controller) {
         onDispose {
-            // Cleanup if needed
+            platformController.dispose()
         }
     }
 

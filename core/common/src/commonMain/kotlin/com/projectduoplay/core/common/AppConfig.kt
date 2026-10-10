@@ -9,13 +9,14 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AppConfig(
     val appName: String,
+    val appSubtitle: String = "",
     val appId: String,
     val baseUrl: String,
     val enableAnalytics: Boolean = true,
     val enablePushNotifications: Boolean = true,
     val enableDeepLinking: Boolean = true,
-    val enableJavaScriptBridge: Boolean = true,
-    val allowedDomains: List<String> = emptyList(),
+    val enableJavaScriptBridge: Boolean = false,
+    val allowedOrigins: List<String>,
     val customUserAgent: String? = null,
     val theme: AppTheme = AppTheme()
 )

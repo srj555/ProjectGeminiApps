@@ -5,15 +5,15 @@ package com.projectduoplay.feature.webview
  */
 data class WebViewConfig(
     val initialUrl: String,
-    val allowedDomains: List<String> = emptyList(),
+    val allowedOrigins: List<String>,
     val enableJavaScript: Boolean = true,
+    val enableJavaScriptBridge: Boolean = false,
     val enableDomStorage: Boolean = true,
     val enableCache: Boolean = true,
     val enableZoom: Boolean = false,
     val userAgentSuffix: String? = null,
     val javaScriptBridgeName: String = "NativeBridge",
     val enableSafeBrowsing: Boolean = true,
-    val supportMultipleWindows: Boolean = false,
     val mixedContentMode: MixedContentMode = MixedContentMode.NEVER_ALLOW
 )
 

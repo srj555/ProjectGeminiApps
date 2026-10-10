@@ -1,0 +1,19 @@
+schema_version = 1
+id = "vman"
+display_name = "VMan"
+subtitle = "Shadow of the Last Ninja"
+start_url = "https://v-man-shadow-of-the-last-ninja-589720827506.us-west1.run.app"
+allowed_origins = ["https://v-man-shadow-of-the-last-ninja-589720827506.us-west1.run.app"]
+icon = "icons/vman.png"
+version_name = "1.0.0"
+version_code = 1
+required_capabilities = ["external_navigation", "web_history", "offline_retry", "persistent_session"]
+
+[android]
+application_id = "com.vman.app"
+
+[ios]
+bundle_id = "com.vman.app"
+scheme = "VMan"
+url_scheme = "vman"
+associated_domain = "v-man-shadow-of-the-last-ninja-589720827506.us-west1.run.app"

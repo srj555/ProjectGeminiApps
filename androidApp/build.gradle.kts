@@ -7,15 +7,66 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+val appProfileId = providers.gradleProperty("appProfile").orNull
+    ?: throw GradleException(
+        "Missing -PappProfile. Run ./wrapper build --profile <id> --platform android ..."
+    )
+if (!appProfileId.matches(Regex("^[a-z][a-z0-9_]*$"))) {
+    throw GradleException("Invalid appProfile: $appProfileId")
+}
+val generatedProfileDirectory = rootProject.file("config/generated/profiles/$appProfileId")
+val profilePropertiesFile = generatedProfileDirectory.resolve("android.properties")
+if (!profilePropertiesFile.isFile) {
+    throw GradleException(
+        "Generated profile not found for $appProfileId. " +
+            "Run ./wrapper generate --profile $appProfileId --platform android"
+    )
+}
+val profileProperties = Properties().apply {
+    profilePropertiesFile.inputStream().use(::load)
+}
+fun profileValue(key: String): String = profileProperties.getProperty(key)
+    ?: throw GradleException("Generated profile $appProfileId is missing $key")
+fun quotedBuildConfig(value: String): String = buildString {
+    append('"')
+    value.forEach { character ->
+        when (character) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            else -> append(character)
+        }
+    }
+    append('"')
+}
+
+layout.buildDirectory.set(rootProject.layout.projectDirectory.dir(".build/android/$appProfileId/androidApp"))
+
 android {
     namespace = "com.projectduoplay.android"
     compileSdk = 35
 
     defaultConfig {
+        applicationId = profileValue("android.applicationId")
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = profileValue("app.versionCode").toInt()
+        versionName = profileValue("app.versionName")
+        manifestPlaceholders["appHost"] = profileValue("android.deepLinkHost")
+
+        buildConfigField("String", "APP_NAME", quotedBuildConfig(profileValue("app.name")))
+        buildConfigField("String", "APP_SUBTITLE", quotedBuildConfig(profileValue("app.subtitle")))
+        buildConfigField("String", "BASE_URL", quotedBuildConfig(profileValue("app.startUrl")))
+        buildConfigField("String", "ALLOWED_ORIGINS", quotedBuildConfig(profileValue("app.allowedOrigins")))
+        buildConfigField(
+            "boolean",
+            "ENABLE_JAVASCRIPT_BRIDGE",
+            profileValue("app.enableJavaScriptBridge")
+        )
+        buildConfigField("boolean", "ENABLE_ANALYTICS", "false")
+        buildConfigField("boolean", "ENABLE_PUSH_NOTIFICATIONS", "false")
+        resValue("string", "app_name", profileValue("app.name"))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -31,8 +82,8 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            if (keystorePropertiesFile.exists()) {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
                 storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
@@ -45,7 +96,9 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -57,61 +110,7 @@ android {
         }
     }
 
-    flavorDimensions += "app"
-
-    productFlavors {
-        create("duoplay") {
-            dimension = "app"
-            applicationId = "com.duoplay.app"
-            versionNameSuffix = "-duoplay"
-
-            // Flavor-specific build config
-            buildConfigField("String", "APP_NAME", "\"DuoPlay\"")
-            buildConfigField("String", "APP_SUBTITLE", "\"\"")
-            buildConfigField("String", "BASE_URL", "\"https://duoplay-589720827506.us-west1.run.app\"")
-            buildConfigField("boolean", "ENABLE_ANALYTICS", "true")
-            buildConfigField("boolean", "ENABLE_PUSH_NOTIFICATIONS", "true")
-
-            // Resource values
-            resValue("string", "app_name", "DuoPlay")
-            resValue("string", "base_url", "https://duoplay-589720827506.us-west1.run.app")
-        }
-
-        create("vman") {
-            dimension = "app"
-            applicationId = "com.vman.app"
-            versionNameSuffix = "-vman"
-
-            // Flavor-specific build config
-            buildConfigField("String", "APP_NAME", "\"VMan\"")
-            buildConfigField("String", "APP_SUBTITLE", "\"Shadow of the Last Ninja\"")
-            buildConfigField("String", "BASE_URL", "\"https://v-man-shadow-of-the-last-ninja-589720827506.us-west1.run.app\"")
-            buildConfigField("boolean", "ENABLE_ANALYTICS", "true")
-            buildConfigField("boolean", "ENABLE_PUSH_NOTIFICATIONS", "true")
-
-            // Resource values
-            resValue("string", "app_name", "VMan")
-            resValue("string", "base_url", "https://v-man-shadow-of-the-last-ninja-589720827506.us-west1.run.app")
-        }
-
-        // Template for creating new flavors
-        // Uncomment and modify for new apps
-        /*
-        create("myapp") {
-            dimension = "app"
-            applicationId = "com.myapp.app"
-            versionNameSuffix = "-myapp"
-
-            buildConfigField("String", "APP_NAME", "\"MyApp\"")
-            buildConfigField("String", "BASE_URL", "\"https://myapp.example.com\"")
-            buildConfigField("boolean", "ENABLE_ANALYTICS", "true")
-            buildConfigField("boolean", "ENABLE_PUSH_NOTIFICATIONS", "true")
-
-            resValue("string", "app_name", "MyApp")
-            resValue("string", "base_url", "https://myapp.example.com")
-        }
-        */
-    }
+    sourceSets.getByName("main").res.srcDir(generatedProfileDirectory.resolve("android/res"))
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -1,0 +1,19 @@
+schema_version = 1
+id = "duoplay"
+display_name = "DuoPlay"
+subtitle = ""
+start_url = "https://duoplay-589720827506.us-west1.run.app"
+allowed_origins = ["https://duoplay-589720827506.us-west1.run.app"]
+icon = "icons/duoplay.png"
+version_name = "1.0.0"
+version_code = 1
+required_capabilities = ["external_navigation", "web_history", "offline_retry", "persistent_session"]
+
+[android]
+application_id = "com.duoplay.app"
+
+[ios]
+bundle_id = "com.duoplay.app"
+scheme = "DuoPlay"
+url_scheme = "duoplay"
+associated_domain = "duoplay-589720827506.us-west1.run.app"

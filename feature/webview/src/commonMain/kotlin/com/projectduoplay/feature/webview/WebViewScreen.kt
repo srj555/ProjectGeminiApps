@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,12 +39,17 @@ fun WebViewScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val networkStatus by viewModel.networkStatus.collectAsState()
+    val controller = remember(viewModel.webViewConfig) {
+        PlatformWebViewController(viewModel.webViewConfig)
+    }
+    val canGoBack by controller.canGoBack.collectAsState()
 
-    val controller = PlatformWebViewController(viewModel.webViewConfig)
-
-    LaunchedEffect(controller) {
+    LaunchedEffect(viewModel, controller) {
         viewModel.initializeWebView(controller)
+    }
+
+    PlatformBackHandler(enabled = canGoBack) {
+        viewModel.goBack()
     }
 
     Box(

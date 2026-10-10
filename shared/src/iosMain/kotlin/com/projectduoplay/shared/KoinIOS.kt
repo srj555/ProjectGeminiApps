@@ -9,6 +9,7 @@ import com.projectduoplay.shared.di.commonModule
 import com.projectduoplay.shared.di.platformModule
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
+import platform.Foundation.NSBundle
 
 fun startKoinIOS() = startKoin {
     modules(
@@ -22,27 +23,43 @@ fun startKoinIOS() = startKoin {
 }
 
 private fun iosAppModule() = module {
-    single<AppConfigProvider> {
-        object : AppConfigProvider {
-            override fun getConfig(): AppConfig {
-                // Read from Info.plist or Config
-                return AppConfig(
-                    appName = "DuoPlay",
-                    appId = "com.duoplay.app",
-                    baseUrl = "https://duoplay-589720827506.us-west1.run.app",
-                    enableAnalytics = true,
-                    enablePushNotifications = true,
-                    enableDeepLinking = true,
-                    enableJavaScriptBridge = true,
-                    allowedDomains = listOf("duoplay-589720827506.us-west1.run.app"),
-                    customUserAgent = "DuoPlay/1.0.0",
-                    theme = AppTheme(
-                        primaryColor = "#6200EE",
-                        splashScreenBackground = "#FFFFFF",
-                        statusBarColor = "#6200EE"
-                    )
-                )
-            }
-        }
+    single<AppConfigProvider> { IOSAppConfigProvider() }
+}
+
+private class IOSAppConfigProvider(
+    private val bundle: NSBundle = NSBundle.mainBundle
+) : AppConfigProvider {
+    override fun getConfig(): AppConfig {
+        val appName = requiredString("AppName")
+        val version = string("CFBundleShortVersionString") ?: "1.0"
+
+        return AppConfig(
+            appName = appName,
+            appSubtitle = string("AppSubtitle").orEmpty(),
+            appId = bundle.bundleIdentifier ?: error("Missing iOS bundle identifier"),
+            baseUrl = requiredString("AppStartURL"),
+            enableAnalytics = false,
+            enablePushNotifications = false,
+            enableDeepLinking = true,
+            enableJavaScriptBridge = string("AppEnableJavaScriptBridge")
+                ?.equals("true", ignoreCase = true) == true,
+            allowedOrigins = requiredString("AppAllowedOrigins")
+                .split('|')
+                .map(String::trim)
+                .filter(String::isNotEmpty),
+            customUserAgent = "$appName/$version",
+            theme = AppTheme(
+                primaryColor = "#FFFFFF",
+                splashScreenBackground = "#000000",
+                statusBarColor = "#000000"
+            )
+        )
     }
+
+    private fun requiredString(key: String): String =
+        string(key)?.takeIf(String::isNotBlank)
+            ?: error("Missing required Info.plist value: $key")
+
+    private fun string(key: String): String? =
+        bundle.objectForInfoDictionaryKey(key) as? String
 }

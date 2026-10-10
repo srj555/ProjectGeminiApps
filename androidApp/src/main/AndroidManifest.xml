@@ -37,7 +37,7 @@
                 <!-- Add your deep link schemes here -->
                 <data
                     android:scheme="https"
-                    android:host="duoplay-589720827506.us-west1.run.app" />
+                    android:host="${appHost}" />
             </intent-filter>
         </activity>
     </application>
