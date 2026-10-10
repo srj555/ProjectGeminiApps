@@ -41,6 +41,7 @@ actual class PlatformWebViewController actual constructor(
     private var messageHandler: ((JavaScriptMessage) -> Unit)? = null
     private var scriptMessageHandler: WKScriptMessageHandlerProtocol? = null
     private var navigationDelegate: WKNavigationDelegateProtocol? = null
+    private val deferredLoads = DeferredUrlQueue()
     private val navigationPolicy = NavigationPolicy(
         config.allowedOrigins,
         config.allowAnyHttpsOrigin
@@ -148,8 +149,16 @@ actual class PlatformWebViewController actual constructor(
 
         // Configure WebView settings
         webView.allowsBackForwardNavigationGestures = true
+        webView.scrollView.scrollEnabled = true
+        webView.scrollView.bounces = true
+        webView.scrollView.delaysContentTouches = false
 
         this.webView = webView
+        deferredLoads.attach { destination ->
+            NSURL.URLWithString(destination)?.let { nsUrl ->
+                webView.loadRequest(NSURLRequest.requestWithURL(nsUrl))
+            }
+        }
         return webView
     }
 
@@ -167,9 +176,11 @@ actual class PlatformWebViewController actual constructor(
             )
             return
         }
-        NSURL.URLWithString(url)?.let { nsUrl ->
-            val request = NSURLRequest.requestWithURL(nsUrl)
-            webView?.loadRequest(request)
+        _loadingState.value = WebViewLoadingState.Loading(0)
+        deferredLoads.load(url, webView != null) { destination ->
+            NSURL.URLWithString(destination)?.let { nsUrl ->
+                webView?.loadRequest(NSURLRequest.requestWithURL(nsUrl))
+            }
         }
     }
 
@@ -208,6 +219,7 @@ actual class PlatformWebViewController actual constructor(
         webView?.configuration?.userContentController
             ?.removeScriptMessageHandlerForName(config.javaScriptBridgeName)
         webView = null
+        deferredLoads.clear()
         navigationDelegate = null
         scriptMessageHandler = null
         messageHandler = null

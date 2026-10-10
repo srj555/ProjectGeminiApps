@@ -27,6 +27,10 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILES_DIR = ROOT / "profiles"
 GENERATED_DIR = ROOT / "config" / "generated"
 DIST_DIR = ROOT / "dist"
+SHARED_FINGERPRINT_SOURCE = (
+    ROOT / "shared" / "build" / "generated" / "sharedFingerprint" / "commonMain"
+    / "kotlin" / "com" / "projectduoplay" / "shared" / "SharedBuildFingerprint.kt"
+)
 SUPPORTED_CAPABILITIES = {
     "dynamic_https_destination",
     "external_navigation",
@@ -365,7 +369,35 @@ def generate_android(profile: dict[str, Any]) -> None:
     shutil.copytree(profile["android_icon_resources"], resource_destination)
 
 
-def generate_ios_config(profile: dict[str, Any]) -> None:
+def shared_source_fingerprint() -> str:
+    digest = hashlib.sha256()
+    source_roots = [ROOT / "core", ROOT / "feature", ROOT / "shared" / "src"]
+    files = [
+        item
+        for source_root in source_roots
+        for item in source_root.rglob("*")
+        if item.is_file() and item.suffix in {".kt", ".kts"}
+    ]
+    files.extend([ROOT / "shared" / "build.gradle.kts", ROOT / "gradle" / "libs.versions.toml"])
+    for path in sorted(set(files)):
+        digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def generate_shared_build_fingerprint(fingerprint: str) -> None:
+    source = f'''package com.projectduoplay.shared
+
+private const val SharedBuildFingerprint = "{fingerprint}"
+
+fun sharedBuildFingerprint(): String = SharedBuildFingerprint
+'''
+    atomic_write(SHARED_FINGERPRINT_SOURCE, source)
+
+
+def generate_ios_config(profile: dict[str, Any], shared_fingerprint: str) -> None:
     profile_id = profile["id"]
     scheme = profile["ios"]["scheme"]
     generated_config = ROOT / "iosApp" / "Config" / "Generated"
@@ -382,6 +414,7 @@ APP_START_URL = {xcconfig_url(profile['start_url'])}
 APP_ALLOWED_ORIGINS = {'|'.join(xcconfig_url(item) for item in profile['allowed_origins'])}
 APP_ASSOCIATED_DOMAIN = applinks:{profile['ios']['associated_domain']}
 ASSETCATALOG_COMPILER_APPICON_NAME = {scheme}AppIcon
+SHARED_BUILD_FINGERPRINT = {shared_fingerprint}
 MARKETING_VERSION = {profile['version_name']}
 CURRENT_PROJECT_VERSION = {profile['version_code']}
 """
@@ -518,8 +551,10 @@ def generate(profiles: dict[str, dict[str, Any]], selected: str, platform: str) 
             for profile in chosen:
                 generate_android(profile)
         if platform in ("ios", "all"):
+            shared_fingerprint = shared_source_fingerprint()
+            generate_shared_build_fingerprint(shared_fingerprint)
             for profile in profiles.values():
-                generate_ios_config(profile)
+                generate_ios_config(profile, shared_fingerprint)
             generate_xcode_project(profiles)
         manifest = {
             "profiles": sorted(profiles),
@@ -691,9 +726,59 @@ def inspect_android_artifact(
     print(f"Verified packaged Android {artifact.upper()} signature")
 
 
-def prepare_ios(profiles: dict[str, dict[str, Any]]) -> None:
+def prepare_ios() -> None:
     run([str(ROOT / "gradlew"), "--no-parallel", ":shared:generateDummyFramework"], env=environment())
     run(["pod", "install"], cwd=ROOT / "iosApp", env=environment())
+
+
+def binary_contains_fingerprint(binary: Path, expected: str) -> bool:
+    if not binary.is_file():
+        return False
+    contents = binary.read_bytes()
+    return any(
+        expected.encode(encoding) in contents
+        for encoding in ("ascii", "utf-16le", "utf-16be")
+    )
+
+
+def require_binary_fingerprint(binary: Path, expected: str, label: str) -> None:
+    if not binary.is_file():
+        fail(f"{label} binary is missing at {binary}")
+    if not binary_contains_fingerprint(binary, expected):
+        fail(
+            f"{label} does not contain current shared source fingerprint {expected}; "
+            "refusing to package or install a stale framework"
+        )
+    print(f"Verified {label} shared source fingerprint: {expected}")
+
+
+def sync_ios_framework(configuration: str, platform_name: str, archs: str, fingerprint: str) -> Path:
+    sync_environment = environment()
+    sdk = "iphonesimulator" if platform_name == "iphonesimulator" else "iphoneos"
+    sdk_version = output(["xcrun", "--sdk", sdk, "--show-sdk-version"], env=sync_environment)
+    resources_root = ROOT / ".build" / "ios" / "shared-sync" / platform_name / configuration
+    sync_environment.update({
+        "ARCHS": archs,
+        "CONFIGURATION": configuration.capitalize(),
+        "PLATFORM_NAME": platform_name,
+        "SDK_NAME": f"{sdk}{sdk_version}",
+        "TARGET_BUILD_DIR": str(resources_root),
+        "UNLOCALIZED_RESOURCES_FOLDER_PATH": "compose-resources",
+    })
+    run(
+        [
+            str(ROOT / "gradlew"),
+            "--no-parallel",
+            ":shared:syncFramework",
+            f"-Pkotlin.native.cocoapods.platform={platform_name}",
+            f"-Pkotlin.native.cocoapods.archs={archs}",
+            f"-Pkotlin.native.cocoapods.configuration={configuration.capitalize()}",
+        ],
+        env=sync_environment,
+    )
+    binary = ROOT / "shared" / "build" / "cocoapods" / "framework" / "shared.framework" / "shared"
+    require_binary_fingerprint(binary, fingerprint, "freshly built shared.framework")
+    return binary
 
 
 def build_ios(profile: dict[str, Any], configuration: str, artifact: str) -> Path:
@@ -702,10 +787,11 @@ def build_ios(profile: dict[str, Any], configuration: str, artifact: str) -> Pat
             "Signed IPA export is intentionally unavailable without an Apple-signed archive "
             "and explicit export options"
         )
-    prepare_ios({profile["id"]: profile})
+    prepare_ios()
     profile_id = profile["id"]
     scheme = profile["ios"]["scheme"]
     derived = ROOT / ".build" / "ios" / profile_id
+    fingerprint = shared_source_fingerprint()
     base = [
         "xcodebuild",
         "-workspace", str(ROOT / "iosApp" / "ProjectGeminiApps.xcworkspace"),
@@ -714,7 +800,15 @@ def build_ios(profile: dict[str, Any], configuration: str, artifact: str) -> Pat
         "-derivedDataPath", str(derived),
     ]
     if artifact == "simulator-app":
-        run(base + ["-sdk", "iphonesimulator", "CODE_SIGNING_ALLOWED=NO", "build"], env=environment())
+        simulator_arch = "arm64" if output(["uname", "-m"]) == "arm64" else "x86_64"
+        sync_ios_framework(configuration, "iphonesimulator", simulator_arch, fingerprint)
+        run(base + [
+            "-sdk", "iphonesimulator",
+            f"ARCHS={simulator_arch}",
+            "ONLY_ACTIVE_ARCH=YES",
+            "CODE_SIGNING_ALLOWED=NO",
+            "build",
+        ], env=environment())
         source = resolve_ios_simulator_app(
             derived / "Build" / "Products",
             configuration,
@@ -725,9 +819,10 @@ def build_ios(profile: dict[str, Any], configuration: str, artifact: str) -> Pat
             shutil.rmtree(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(source, destination)
-        inspect_ios_app(destination, profile)
+        inspect_ios_app(destination, profile, fingerprint)
         return destination
     if artifact == "xcarchive":
+        sync_ios_framework(configuration, "iphoneos", "arm64", fingerprint)
         destination = DIST_DIR / profile_id / "ios" / f"{scheme}.xcarchive"
         run(base + [
             "-destination", "generic/platform=iOS",
@@ -739,8 +834,9 @@ def build_ios(profile: dict[str, Any], configuration: str, artifact: str) -> Pat
     fail(f"Unsupported iOS artifact: {artifact}")
 
 
-def inspect_ios_app(app: Path, profile: dict[str, Any]) -> None:
+def inspect_ios_app(app: Path, profile: dict[str, Any], fingerprint: str | None = None) -> None:
     info = plistlib.loads((app / "Info.plist").read_bytes())
+    expected_fingerprint = fingerprint or shared_source_fingerprint()
     checks = {
         "CFBundleIdentifier": profile["ios"]["bundle_id"],
         "CFBundleDisplayName": profile["display_name"],
@@ -749,10 +845,23 @@ def inspect_ios_app(app: Path, profile: dict[str, Any]) -> None:
         "CADisableMinimumFrameDurationOnPhone": True,
         "AppStartURL": profile["start_url"],
         "AppAllowedOrigins": "|".join(profile["allowed_origins"]),
+        "SharedBuildFingerprint": expected_fingerprint,
     }
     for key, expected in checks.items():
         if info.get(key) != expected:
             fail(f"Packaged iOS {key}={info.get(key)!r}, expected {expected!r}")
+    executable = app / info["CFBundleExecutable"]
+    linked_binaries = [executable, app / f"{executable.name}.debug.dylib"]
+    linked_binary = next(
+        (item for item in linked_binaries if binary_contains_fingerprint(item, expected_fingerprint)),
+        None,
+    )
+    if linked_binary is None:
+        fail(
+            f"Packaged iOS linked binary does not contain current shared source fingerprint "
+            f"{expected_fingerprint}; refusing to install a stale framework"
+        )
+    print(f"Verified packaged iOS linked fingerprint in {linked_binary.name}: {expected_fingerprint}")
     print(f"Verified packaged iOS profile: {profile['id']}")
 
 

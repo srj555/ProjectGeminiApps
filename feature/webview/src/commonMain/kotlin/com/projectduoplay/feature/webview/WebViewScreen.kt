@@ -66,6 +66,9 @@ fun WebViewScreen(
 
         // Overlays
         when (uiState) {
+            is WebViewUiState.Loading -> {
+                LoadingView(modifier = Modifier.fillMaxSize())
+            }
             is WebViewUiState.Error -> {
                 // Full screen error overlay
                 val errorState = uiState as WebViewUiState.Error
@@ -79,6 +82,20 @@ fun WebViewScreen(
                 // WebView is visible, no overlay
             }
         }
+    }
+}
+
+@Composable
+private fun LoadingView(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.background(DarkBackground),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "Opening website…",
+            fontSize = 16.sp,
+            color = TextSecondary,
+        )
     }
 }
 

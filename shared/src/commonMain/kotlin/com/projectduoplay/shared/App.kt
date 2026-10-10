@@ -7,12 +7,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
@@ -31,8 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -115,6 +124,7 @@ fun App(
 private fun PortalApp(viewModel: WebViewViewModel) {
     val controller = remember { PortalController(SettingsPortalDestinationStore()) }
     val state by controller.state.collectAsState()
+    PortalSettingsGesture(onShowSettings = controller::showSettings)
 
     Box(
         modifier = Modifier
@@ -134,22 +144,12 @@ private fun PortalApp(viewModel: WebViewViewModel) {
             PortalSetupScreen(
                 state = state,
                 onInputChange = controller::updateInput,
-                onPreview = controller::previewInput,
-                onSave = controller::saveAndOpen,
+                onNext = controller::openInput,
                 onClose = controller::closeSettings,
                 onReset = controller::requestReset,
                 onClearData = controller::requestClearWebsiteData,
                 onReload = viewModel::reload,
             )
-        } else {
-            OutlinedButton(
-                onClick = controller::showSettings,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp),
-            ) {
-                Text("Settings")
-            }
         }
 
         if (state.resetConfirmationVisible) {
@@ -189,13 +189,19 @@ private fun PortalApp(viewModel: WebViewViewModel) {
 private fun PortalSetupScreen(
     state: PortalState,
     onInputChange: (String) -> Unit,
-    onPreview: () -> Unit,
-    onSave: () -> Unit,
+    onNext: () -> Unit,
     onClose: () -> Unit,
     onReset: () -> Unit,
     onClearData: () -> Unit,
     onReload: () -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val submit = {
+        dismissKeyboard(focusManager, keyboardController)
+        onNext()
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Color(0xFF070A12),
@@ -203,6 +209,8 @@ private fun PortalSetupScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -219,6 +227,8 @@ private fun PortalSetupScreen(
                 placeholder = { Text("example.com") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { submit() }),
             )
             state.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 10.dp))
@@ -227,10 +237,17 @@ private fun PortalSetupScreen(
                 Text(it, color = Color(0xFF9FA8C5), modifier = Modifier.padding(top = 10.dp))
             }
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onPreview, modifier = Modifier.fillMaxWidth()) {
-                Text("Review destination")
+            Button(onClick = submit, modifier = Modifier.fillMaxWidth()) {
+                Text("Next")
             }
-            OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
+
+            OutlinedButton(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+            ) {
                 Text("Scan QR — pending")
             }
             Text(
@@ -240,27 +257,8 @@ private fun PortalSetupScreen(
                 textAlign = TextAlign.Center,
             )
 
-            state.pendingUrl?.let { pending ->
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 20.dp),
-                    color = Color(0xFF151A2A),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Column(Modifier.padding(18.dp)) {
-                        Text("Confirm destination", fontWeight = FontWeight.Bold)
-                        Text(pending, color = Color(0xFFB8C4EE), modifier = Modifier.padding(vertical = 10.dp))
-                        Text("Portal will save and open this HTTPS address. Scanned or typed text is never executed as code.", fontSize = 12.sp)
-                        Button(onClick = onSave, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                            Text("Save & open")
-                        }
-                    }
-                }
-            }
-
             if (state.savedUrl != null) {
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(24.dp))
                 Row(Modifier.fillMaxWidth()) {
                     TextButton(onClick = onClose, modifier = Modifier.weight(1f)) { Text("Back to site") }
                     TextButton(onClick = onReload, modifier = Modifier.weight(1f)) { Text("Reload") }
@@ -272,4 +270,12 @@ private fun PortalSetupScreen(
             }
         }
     }
+}
+
+private fun dismissKeyboard(
+    focusManager: FocusManager,
+    keyboardController: SoftwareKeyboardController?,
+) {
+    focusManager.clearFocus(force = true)
+    keyboardController?.hide()
 }

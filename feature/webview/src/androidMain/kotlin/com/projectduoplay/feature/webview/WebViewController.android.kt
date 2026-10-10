@@ -37,6 +37,7 @@ actual class PlatformWebViewController actual constructor(
 
     private var messageHandler: ((JavaScriptMessage) -> Unit)? = null
     private var webView: WebView? = null
+    private val deferredLoads = DeferredUrlQueue()
     private val navigationPolicy = NavigationPolicy(
         config.allowedOrigins,
         config.allowAnyHttpsOrigin
@@ -100,6 +101,8 @@ actual class PlatformWebViewController actual constructor(
                 config.javaScriptBridgeName
             )
         }
+
+        deferredLoads.attach(webView::loadUrl)
     }
 
     private fun createWebViewClient() = object : WebViewClient() {
@@ -202,7 +205,10 @@ actual class PlatformWebViewController actual constructor(
 
     override fun loadUrl(url: String) {
         if (navigationPolicy.decide(url) == NavigationDecision.ALLOW_IN_WEB_VIEW) {
-            webView?.loadUrl(url)
+            _loadingState.value = WebViewLoadingState.Loading(0)
+            deferredLoads.load(url, webView != null) { destination ->
+                webView?.loadUrl(destination)
+            }
         } else {
             _loadingState.value = WebViewLoadingState.Error(
                 errorCode = ERROR_BLOCKED_NAVIGATION,
@@ -255,6 +261,7 @@ actual class PlatformWebViewController actual constructor(
             destroy()
         }
         webView = null
+        deferredLoads.clear()
         messageHandler = null
     }
 

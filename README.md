@@ -7,10 +7,10 @@ The repository currently contains two fixed-site examples and one generic launch
 | Profile | Android ID | iOS bundle ID | Start URL |
 | --- | --- | --- | --- |
 | `duoplay` | `com.duoplay.app` | `com.duoplay.app` | `https://duoplay-589720827506.us-west1.run.app` |
-| `portal` | `com.srj555.portal` | `com.srj555.portal` | Selected and confirmed on first launch |
+| `portal` | `com.srj555.portal` | `com.srj555.portal` | Selected on first launch |
 | `vman` | `com.vman.app` | `com.vman.app` | `https://v-man-shadow-of-the-last-ninja-589720827506.us-west1.run.app` |
 
-DuoPlay and VMan have been built as debug APKs and unsigned iOS Simulator apps. Portal has also been built as a debug APK and built, Personal-Team signed, installed, and launched on a physical iPhone. That does not make a profile store-ready by itself: signing, store metadata/privacy review, real-device coverage, and site-specific capabilities remain per-app release gates.
+DuoPlay and VMan have been built as debug APKs and unsigned iOS Simulator apps. Portal has also been built as a debug APK. DuoPlay and Portal 1.0.1 (build 2) have been Personal-Team signed, installed in place, and launched on a physical iPhone. That does not make a profile store-ready by itself: distribution signing, store metadata/privacy review, broader real-device coverage, and site-specific capabilities remain per-app release gates.
 
 ## Quick start
 
@@ -82,7 +82,7 @@ Validation fails closed on unknown fields, duplicate app IDs/bundle IDs/schemes,
 | iOS | Device archive | `xcarchive` | Generated with code signing disabled; not distributable |
 | iOS | IPA | `ipa` | Intentionally rejected until an Apple-signed archive and export options are supplied |
 
-Artifacts are copied to `dist/<profile>/<platform>/`. The wrapper inspects the packaged Android application ID and signature and the iOS bundle/profile fields before reporting success. APK verification uses Android SDK tools; AAB verification uses `bundletool` plus `jarsigner`. Android release commands fail before Gradle unless a complete ignored signing configuration resolves to a real keystore, and they never fall back to debug signing.
+Artifacts are copied to `dist/<profile>/<platform>/`. The wrapper inspects the packaged Android application ID and signature and the iOS bundle/profile fields before reporting success. iOS builds also embed a fingerprint of the shared Kotlin sources and fail before packaging if the newly synced framework or linked app binary does not contain that fingerprint. APK verification uses Android SDK tools; AAB verification uses `bundletool` plus `jarsigner`. Android release commands fail before Gradle unless a complete ignored signing configuration resolves to a real keystore, and they never fall back to debug signing.
 
 ## Runtime behavior and security
 
@@ -96,7 +96,7 @@ Artifacts are copied to `dist/<profile>/<platform>/`. The wrapper inspects the p
 - WebView instances are retained across Compose recomposition and disposed with their screen lifecycle.
 - Safe-area insets are applied on both platforms.
 
-Portal uses a separate `launcher` mode rather than weakening the fixed-origin policy used by DuoPlay and VMan. It accepts a typed destination, normalizes a bare hostname to HTTPS, requires an explicit preview/confirmation before the first load, and stores the confirmed URL per installation. It rejects cleartext HTTP, credentials in URLs, and executable/local schemes. Resetting the saved destination keeps website sessions; the separate confirmed “Clear website data” action removes cookies, cache, and website storage.
+Portal uses a separate `launcher` mode rather than weakening the fixed-origin policy used by DuoPlay and VMan. It accepts a typed destination, normalizes a bare hostname to HTTPS, and the Next action validates, stores, and opens it in one step. The keyboard Next action follows the same path and dismisses focus before the WebView opens. Portal rejects cleartext HTTP, credentials in URLs, and executable/local schemes. Resetting the saved destination keeps website sessions; the separate confirmed “Clear website data” action removes cookies, cache, and website storage.
 
 ### Browser capability matrix
 
@@ -105,16 +105,16 @@ Portal uses a separate `launcher` mode rather than weakening the fixed-origin po
 | HTTPS pages and redirects | Exact configured origins | Any confirmed HTTPS origin | This is a WebView boundary, not a subresource firewall |
 | Cookies, local storage, service workers | Persistent | Persistent | Kept across URL reset; removed only by explicit website-data clearing |
 | Back/forward history and reload | Yes | Yes | Uses the platform WebView history |
-| Manual URL setup and visible settings | No | Yes | URL changes require preview and confirmation |
+| Manual URL setup | No | Yes | Next validates, persists, and opens the HTTPS destination in one step |
 | QR destination scan | No | Pending | The current Portal build labels this unavailable and supports manual entry |
-| Shake-to-open settings | No | Pending | A visible Settings control is always available |
+| Shake-to-open settings | No | iOS | The loaded site has no Settings overlay; shaking the iPhone reopens Portal settings |
 | File upload/download integration | No | No | Site behavior may vary; no native picker/download manager contract exists |
 | Website camera/microphone | Not guaranteed | Not guaranteed | No native permission mediation has been implemented |
 | OAuth/SSO | Provider-dependent | Provider-dependent | Embedded user agents may be rejected; no system-browser callback specialization |
 | DRM, native payments, passkeys | Not guaranteed | Not guaranteed | Do not assume Safari/Chrome parity or native entitlement support |
 | Native JavaScript bridge | Disabled | Disabled | Sites receive no native privilege channel |
 
-Portal deliberately does not claim Safari or Chrome parity. QR scanning and shake-to-settings remain follow-up capabilities; the shipped core uses manual HTTPS entry plus a visible Settings control.
+Portal deliberately does not claim Safari or Chrome parity. QR scanning and Android settings re-entry remain follow-up capabilities; iOS uses manual HTTPS entry and shake-to-settings without a visible website overlay.
 
 The origin policy is a top-level navigation boundary, not a network or subresource firewall. Wrapped pages can still request their normal third-party assets; enforce API/content policy with the website's CSP, CORS, authentication, and server controls.
 

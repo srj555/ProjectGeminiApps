@@ -28,7 +28,6 @@ class SettingsPortalDestinationStore(
 data class PortalState(
     val savedUrl: String? = null,
     val input: String = "",
-    val pendingUrl: String? = null,
     val error: String? = null,
     val settingsVisible: Boolean = savedUrl == null,
     val resetConfirmationVisible: Boolean = false,
@@ -50,40 +49,34 @@ class PortalController(private val store: PortalDestinationStore) {
     )
     val state: StateFlow<PortalState> = _state.asStateFlow()
 
-    fun updateInput(value: String) = update { copy(input = value, error = null, pendingUrl = null) }
+    fun updateInput(value: String) = update { copy(input = value, error = null) }
 
-    fun previewInput() = preview(_state.value.input)
+    fun openInput() = saveAndOpen(_state.value.input)
 
-    fun previewQrPayload(value: String) = preview(value)
+    fun openQrPayload(value: String) = saveAndOpen(value)
 
-    private fun preview(value: String) {
+    private fun saveAndOpen(value: String) {
         when (val result = normalizeLauncherUrl(value)) {
-            is LauncherUrlResult.Valid -> update {
-                copy(input = result.url, pendingUrl = result.url, error = null, message = null)
+            is LauncherUrlResult.Valid -> {
+                store.save(result.url)
+                update {
+                    copy(
+                        savedUrl = result.url,
+                        input = result.url,
+                        error = null,
+                        settingsVisible = false,
+                        message = null,
+                    )
+                }
             }
             is LauncherUrlResult.Invalid -> update {
-                copy(pendingUrl = null, error = result.message, message = null)
+                copy(error = result.message, message = null)
             }
-        }
-    }
-
-    fun saveAndOpen() {
-        val destination = _state.value.pendingUrl ?: return
-        store.save(destination)
-        update {
-            copy(
-                savedUrl = destination,
-                input = destination,
-                pendingUrl = null,
-                error = null,
-                settingsVisible = false,
-                message = null,
-            )
         }
     }
 
     fun showSettings() = update {
-        copy(settingsVisible = true, input = savedUrl.orEmpty(), pendingUrl = null, error = null)
+        copy(settingsVisible = true, input = savedUrl.orEmpty(), error = null)
     }
 
     fun closeSettings() {
@@ -110,7 +103,7 @@ class PortalController(private val store: PortalDestinationStore) {
     }
 
     fun scannerUnavailable(message: String) = update {
-        copy(error = message, pendingUrl = null)
+        copy(error = message)
     }
 
     private inline fun update(transform: PortalState.() -> PortalState) {

@@ -80,5 +80,7 @@
     <string>$(APP_ALLOWED_ORIGINS)</string>
     <key>AppEnableJavaScriptBridge</key>
     <string>$(APP_ENABLE_JAVASCRIPT_BRIDGE)</string>
+    <key>SharedBuildFingerprint</key>
+    <string>$(SHARED_BUILD_FINGERPRINT)</string>
 </dict>
 </plist>

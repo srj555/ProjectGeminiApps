@@ -41,6 +41,14 @@ class ProfileValidationTest(unittest.TestCase):
     def test_repository_profiles_are_valid(self) -> None:
         self.assertEqual({"duoplay", "portal", "vman"}, set(wrapper_cli.load_profiles()))
 
+    def test_repository_profile_icons_are_distinct(self) -> None:
+        profiles = wrapper_cli.load_profiles()
+        digests = {
+            hashlib.sha256(profile["icon_path"].read_bytes()).hexdigest()
+            for profile in profiles.values()
+        }
+        self.assertEqual(len(profiles), len(digests))
+
     def test_origins_are_canonical_and_exact(self) -> None:
         self.assertEqual(
             "https://example.com",
@@ -244,6 +252,22 @@ class ReleaseSigningTest(unittest.TestCase):
 
 
 class ArtifactSelectionTest(unittest.TestCase):
+    def test_ios_fingerprint_detection_handles_kotlin_native_encodings(self) -> None:
+        fingerprint = "a" * 64
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "linked-binary"
+            for encoding in ("ascii", "utf-16le", "utf-16be"):
+                with self.subTest(encoding=encoding):
+                    binary.write_bytes(b"prefix" + fingerprint.encode(encoding) + b"suffix")
+                    self.assertTrue(
+                        wrapper_cli.binary_contains_fingerprint(binary, fingerprint)
+                    )
+
+            binary.write_bytes(b"stale linked binary")
+            self.assertFalse(wrapper_cli.binary_contains_fingerprint(binary, fingerprint))
+            with self.assertRaisesRegex(wrapper_cli.ProfileError, "refusing"):
+                wrapper_cli.require_binary_fingerprint(binary, fingerprint, "test")
+
     def test_android_artifact_selection_ignores_opposite_configuration(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             outputs = Path(directory)

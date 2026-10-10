@@ -1,60 +1,96 @@
-import AppKit
 import Foundation
 
 struct Icon {
+    let profile: String
     let source: String
     let destination: String
 }
 
 let repositoryRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+let temporaryDirectory = FileManager.default.temporaryDirectory
+    .appendingPathComponent("project-gemini-icons-\(UUID().uuidString)")
+try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+
 let icons = [
     Icon(
+        profile: "duoplay",
         source: "iosApp/Branding/duoplay-icon.svg",
         destination: "profiles/icons/duoplay.png"
     ),
     Icon(
+        profile: "vman",
         source: "iosApp/Branding/vman-icon.svg",
         destination: "profiles/icons/vman.png"
     ),
     Icon(
+        profile: "portal",
         source: "iosApp/Branding/portal-icon.svg",
         destination: "profiles/icons/portal.png"
     )
 ]
+let androidLegacySizes = [
+    "mdpi": 48,
+    "hdpi": 72,
+    "xhdpi": 96,
+    "xxhdpi": 144,
+    "xxxhdpi": 192,
+]
+
+func run(_ executable: String, _ arguments: [String]) throws {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: executable)
+    process.arguments = arguments
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        throw NSError(
+            domain: "ProjectGeminiIcons",
+            code: Int(process.terminationStatus),
+            userInfo: [
+                NSLocalizedDescriptionKey:
+                    "\(executable) failed with status \(process.terminationStatus): \(arguments.joined(separator: " "))"
+            ]
+        )
+    }
+}
 
 for icon in icons {
     let sourceURL = repositoryRoot.appendingPathComponent(icon.source)
     let destinationURL = repositoryRoot.appendingPathComponent(icon.destination)
-    guard let image = NSImage(contentsOf: sourceURL) else {
-        fatalError("Unable to read \(sourceURL.path)")
-    }
-    guard let bitmap = NSBitmapImageRep(
-        bitmapDataPlanes: nil,
-        pixelsWide: 1024,
-        pixelsHigh: 1024,
-        bitsPerSample: 8,
-        samplesPerPixel: 3,
-        hasAlpha: false,
-        isPlanar: false,
-        colorSpaceName: .deviceRGB,
-        bytesPerRow: 0,
-        bitsPerPixel: 0
-    ) else {
-        fatalError("Unable to allocate icon bitmap")
-    }
-
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
-    image.draw(
-        in: NSRect(x: 0, y: 0, width: 1024, height: 1024),
-        from: .zero,
-        operation: .copy,
-        fraction: 1
+    try FileManager.default.createDirectory(
+        at: destinationURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
     )
-    NSGraphicsContext.restoreGraphicsState()
 
-    guard let png = bitmap.representation(using: .png, properties: [:]) else {
-        fatalError("Unable to encode icon PNG")
+    try run("/usr/bin/qlmanage", [
+        "-t", "-s", "1024", "-o", temporaryDirectory.path, sourceURL.path,
+    ])
+    let renderedURL = temporaryDirectory.appendingPathComponent(sourceURL.lastPathComponent + ".png")
+    let jpegURL = temporaryDirectory.appendingPathComponent(icon.profile + ".jpg")
+
+    // The JPEG round-trip intentionally removes the alpha channel. App Store icons
+    // must be opaque, and the source SVG already paints every pixel.
+    try run("/usr/bin/sips", [
+        "-s", "format", "jpeg", "-s", "formatOptions", "best",
+        renderedURL.path, "--out", jpegURL.path,
+    ])
+    try run("/usr/bin/sips", [
+        "-s", "format", "png", jpegURL.path, "--out", destinationURL.path,
+    ])
+
+    for (density, size) in androidLegacySizes {
+        let directory = repositoryRoot.appendingPathComponent(
+            "profiles/android/\(icon.profile)/res/mipmap-\(density)"
+        )
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let launcherURL = directory.appendingPathComponent("ic_launcher.png")
+        let roundURL = directory.appendingPathComponent("ic_launcher_round.png")
+        try run("/usr/bin/sips", [
+            "-z", String(size), String(size), destinationURL.path, "--out", launcherURL.path,
+        ])
+        try Data(contentsOf: launcherURL).write(to: roundURL, options: .atomic)
     }
-    try png.write(to: destinationURL, options: .atomic)
 }

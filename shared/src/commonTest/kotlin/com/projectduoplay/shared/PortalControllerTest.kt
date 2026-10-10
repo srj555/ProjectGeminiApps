@@ -12,9 +12,7 @@ class PortalControllerTest {
         val store = FakeStore()
         val controller = PortalController(store)
         controller.updateInput("example.com")
-        controller.previewInput()
-        assertEquals("https://example.com", controller.state.value.pendingUrl)
-        controller.saveAndOpen()
+        controller.openInput()
         assertEquals("https://example.com", store.value)
         assertFalse(controller.state.value.settingsVisible)
 
@@ -38,8 +36,7 @@ class PortalControllerTest {
     fun invalidQrAndDeniedScannerKeepExistingDestination() {
         val store = FakeStore("https://example.com")
         val controller = PortalController(store)
-        controller.previewQrPayload("javascript:alert(1)")
-        assertNull(controller.state.value.pendingUrl)
+        controller.openQrPayload("javascript:alert(1)")
         assertEquals("https://example.com", controller.state.value.savedUrl)
         controller.scannerUnavailable("Camera access was denied. Enter the URL manually.")
         assertTrue(controller.state.value.error!!.contains("denied"))

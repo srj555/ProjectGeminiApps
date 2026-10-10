@@ -32,24 +32,29 @@ kotlin {
     }
 
     sourceSets {
-        commonMain.dependencies {
-            implementation(projects.core.common)
-            implementation(projects.core.network)
-            implementation(projects.core.analytics)
-            implementation(projects.feature.webview)
+        commonMain {
+            kotlin.srcDir(
+                layout.buildDirectory.dir("generated/sharedFingerprint/commonMain/kotlin")
+            )
+            dependencies {
+                implementation(projects.core.common)
+                implementation(projects.core.network)
+                implementation(projects.core.analytics)
+                implementation(projects.feature.webview)
 
-            implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.multiplatform.settings)
-            implementation(libs.multiplatform.settings.no.arg)
-            implementation(libs.koin.core)
-            implementation(libs.koin.compose)
-            implementation(libs.koin.compose.viewmodel)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.multiplatform.settings)
+                implementation(libs.multiplatform.settings.no.arg)
+                implementation(libs.koin.core)
+                implementation(libs.koin.compose)
+                implementation(libs.koin.compose.viewmodel)
 
-            // Compose
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
+                // Compose
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
+            }
         }
 
         androidMain.dependencies {
