@@ -4,6 +4,7 @@ import com.projectduoplay.core.analytics.Analytics
 import com.projectduoplay.core.analytics.PlatformAnalyticsTracker
 import com.projectduoplay.core.common.AppConfig
 import com.projectduoplay.core.common.AppConfigProvider
+import com.projectduoplay.core.common.AppMode
 import com.projectduoplay.core.common.AppTheme
 import com.projectduoplay.shared.di.commonModule
 import com.projectduoplay.shared.di.platformModule
@@ -37,13 +38,14 @@ private class IOSAppConfigProvider(
             appName = appName,
             appSubtitle = string("AppSubtitle").orEmpty(),
             appId = bundle.bundleIdentifier ?: error("Missing iOS bundle identifier"),
-            baseUrl = requiredString("AppStartURL"),
+            mode = if (string("AppMode") == "launcher") AppMode.LAUNCHER else AppMode.FIXED,
+            baseUrl = string("AppStartURL").orEmpty(),
             enableAnalytics = false,
             enablePushNotifications = false,
             enableDeepLinking = true,
             enableJavaScriptBridge = string("AppEnableJavaScriptBridge")
                 ?.equals("true", ignoreCase = true) == true,
-            allowedOrigins = requiredString("AppAllowedOrigins")
+            allowedOrigins = string("AppAllowedOrigins").orEmpty()
                 .split('|')
                 .map(String::trim)
                 .filter(String::isNotEmpty),

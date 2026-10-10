@@ -39,6 +39,8 @@ kotlin {
             implementation(projects.feature.webview)
 
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.multiplatform.settings)
+            implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
@@ -52,6 +54,10 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.koin.android)
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
     }
 }

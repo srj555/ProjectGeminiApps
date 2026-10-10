@@ -11,6 +11,7 @@ data class AppConfig(
     val appName: String,
     val appSubtitle: String = "",
     val appId: String,
+    val mode: AppMode = AppMode.FIXED,
     val baseUrl: String,
     val enableAnalytics: Boolean = true,
     val enablePushNotifications: Boolean = true,
@@ -20,6 +21,12 @@ data class AppConfig(
     val customUserAgent: String? = null,
     val theme: AppTheme = AppTheme()
 )
+
+@Serializable
+enum class AppMode {
+    FIXED,
+    LAUNCHER
+}
 
 @Serializable
 data class AppTheme(

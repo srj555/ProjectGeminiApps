@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -38,7 +39,7 @@ def digest_paths(paths: list[Path]) -> str:
 
 class ProfileValidationTest(unittest.TestCase):
     def test_repository_profiles_are_valid(self) -> None:
-        self.assertEqual({"duoplay", "vman"}, set(wrapper_cli.load_profiles()))
+        self.assertEqual({"duoplay", "portal", "vman"}, set(wrapper_cli.load_profiles()))
 
     def test_origins_are_canonical_and_exact(self) -> None:
         self.assertEqual(
@@ -66,6 +67,10 @@ class ProfileValidationTest(unittest.TestCase):
             (profiles / "icons").mkdir()
             (profiles / "icons" / "duoplay.png").write_bytes(
                 (ROOT / "profiles" / "icons" / "duoplay.png").read_bytes()
+            )
+            shutil.copytree(
+                ROOT / "profiles" / "android" / "duoplay",
+                profiles / "android" / "duoplay",
             )
             with mock.patch.object(wrapper_cli, "PROFILES_DIR", profiles):
                 (profiles / "duoplay.toml").write_text(original + "\nunknown = true\n")
@@ -138,6 +143,7 @@ class GeneratorIntegrationTest(unittest.TestCase):
             ROOT / "iosApp" / "Podfile",
             ROOT / "iosApp" / "ProjectGeminiApps.xcodeproj",
             ROOT / "iosApp" / "iosApp" / "Assets.xcassets" / "DuoPlayAppIcon.appiconset",
+            ROOT / "iosApp" / "iosApp" / "Assets.xcassets" / "PortalAppIcon.appiconset",
             ROOT / "iosApp" / "iosApp" / "Assets.xcassets" / "VManAppIcon.appiconset",
         ]
         subprocess.run(command + ["duoplay"], cwd=ROOT, check=True, capture_output=True)
@@ -163,6 +169,10 @@ class GeneratorIntegrationTest(unittest.TestCase):
             (profiles / "icons").mkdir(parents=True)
             (profiles / "icons" / "duoplay.png").write_bytes(
                 (ROOT / "profiles" / "icons" / "duoplay.png").read_bytes()
+            )
+            shutil.copytree(
+                ROOT / "profiles" / "android" / "duoplay",
+                profiles / "android" / "duoplay",
             )
             (profiles / "duoplay.toml").write_text(
                 original.replace('display_name = "DuoPlay"', 'display_name = "Café 東京"'),

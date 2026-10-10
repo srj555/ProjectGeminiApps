@@ -36,6 +36,7 @@ private val TextSecondary = Color(0xFFAAAAAA)
 @Composable
 fun WebViewScreen(
     viewModel: WebViewViewModel,
+    initialUrl: String? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -44,8 +45,8 @@ fun WebViewScreen(
     }
     val canGoBack by controller.canGoBack.collectAsState()
 
-    LaunchedEffect(viewModel, controller) {
-        viewModel.initializeWebView(controller)
+    LaunchedEffect(viewModel, controller, initialUrl) {
+        viewModel.initializeWebView(controller, initialUrl)
     }
 
     PlatformBackHandler(enabled = canGoBack) {

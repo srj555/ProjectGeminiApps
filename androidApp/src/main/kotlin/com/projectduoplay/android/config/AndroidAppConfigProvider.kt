@@ -4,6 +4,7 @@ import android.content.Context
 import com.projectduoplay.android.BuildConfig
 import com.projectduoplay.core.common.AppConfig
 import com.projectduoplay.core.common.AppConfigProvider
+import com.projectduoplay.core.common.AppMode
 import com.projectduoplay.core.common.AppTheme
 
 /**
@@ -19,6 +20,7 @@ class AndroidAppConfigProvider(
             appName = BuildConfig.APP_NAME,
             appSubtitle = BuildConfig.APP_SUBTITLE,
             appId = BuildConfig.APPLICATION_ID,
+            mode = if (BuildConfig.APP_MODE == "launcher") AppMode.LAUNCHER else AppMode.FIXED,
             baseUrl = BuildConfig.BASE_URL,
             enableAnalytics = BuildConfig.ENABLE_ANALYTICS,
             enablePushNotifications = BuildConfig.ENABLE_PUSH_NOTIFICATIONS,

@@ -56,6 +56,7 @@ android {
 
         buildConfigField("String", "APP_NAME", quotedBuildConfig(profileValue("app.name")))
         buildConfigField("String", "APP_SUBTITLE", quotedBuildConfig(profileValue("app.subtitle")))
+        buildConfigField("String", "APP_MODE", quotedBuildConfig(profileValue("app.mode")))
         buildConfigField("String", "BASE_URL", quotedBuildConfig(profileValue("app.startUrl")))
         buildConfigField("String", "ALLOWED_ORIGINS", quotedBuildConfig(profileValue("app.allowedOrigins")))
         buildConfigField(

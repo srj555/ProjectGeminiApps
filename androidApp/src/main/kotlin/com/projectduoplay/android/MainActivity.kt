@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        if (BuildConfig.APP_MODE == "launcher") return
         when (intent?.action) {
             Intent.ACTION_VIEW -> {
                 deepLinkUrl = intent.dataString

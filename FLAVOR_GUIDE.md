@@ -5,6 +5,7 @@ Each app is a TOML document under `profiles/`. Do not add Gradle product-flavor 
 ## Required fields
 
 - `id`: lowercase generator key (`[a-z][a-z0-9_]*`)
+- `mode`: `fixed` for one allowlisted site or `launcher` for Portal-style confirmed HTTPS selection
 - `display_name`, `subtitle`: user-facing branding
 - `start_url`: absolute HTTPS URL whose origin is in `allowed_origins`
 - `allowed_origins`: exact canonical HTTPS origins; no path, query, fragment, credentials, or wildcard
@@ -15,13 +16,13 @@ Each app is a TOML document under `profiles/`. Do not add Gradle product-flavor 
 - Android `application_id`
 - iOS `bundle_id`, `scheme`, `url_scheme`, and `associated_domain`
 
-Supported capability declarations in schema v1 are `external_navigation`, `web_history`, `offline_retry`, and `persistent_session`.
+Supported capability declarations in schema v1 are `dynamic_https_destination`, `external_navigation`, `web_history`, `offline_retry`, `persistent_session`, and `settings_reset`. `dynamic_https_destination` is for `launcher` mode; a launcher starts with a blank `start_url`, an empty `allowed_origins` list, and no associated domain.
 
 Requests for OAuth specialization, uploads/downloads, camera, microphone, push, analytics, or a native JavaScript API require implementation and review before they can be declared.
 
 ## Onboarding workflow
 
-1. Copy an existing TOML file and icon.
+1. Copy an existing TOML file, opaque 1024px icon, and `profiles/android/<id>/res` icon-resource directory.
 2. Replace every identity, scheme, domain, URL, name, and icon reference.
 3. Validate all profiles together so collisions are detected.
 4. Generate both platforms.
@@ -30,6 +31,8 @@ Requests for OAuth specialization, uploads/downloads, camera, microphone, push, 
 7. Test startup, allowed navigation, disallowed/external navigation, Android system back, offline/reconnect, authentication/session persistence, and site-specific input on real devices.
 8. Configure signing outside the repository.
 9. Complete store, privacy, legal, and website-association checks.
+
+The Android resource directory must include density-correct legacy and round PNGs, adaptive foreground/background resources, and an Android 13 monochrome drawable. Validation fails if any required icon variant or size is missing. The iOS generator derives its asset catalog from the opaque 1024px profile icon.
 
 ```bash
 ./wrapper validate --profile all

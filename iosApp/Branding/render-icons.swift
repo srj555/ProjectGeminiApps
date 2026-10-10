@@ -10,11 +10,15 @@ let repositoryRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPa
 let icons = [
     Icon(
         source: "iosApp/Branding/duoplay-icon.svg",
-        destination: "iosApp/iosApp/Assets.xcassets/DuoPlayAppIcon.appiconset/DuoPlayAppIcon.png"
+        destination: "profiles/icons/duoplay.png"
     ),
     Icon(
         source: "iosApp/Branding/vman-icon.svg",
-        destination: "iosApp/iosApp/Assets.xcassets/VManAppIcon.appiconset/VManAppIcon.png"
+        destination: "profiles/icons/vman.png"
+    ),
+    Icon(
+        source: "iosApp/Branding/portal-icon.svg",
+        destination: "profiles/icons/portal.png"
     )
 ]
 

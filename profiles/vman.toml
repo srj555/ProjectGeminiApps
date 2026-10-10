@@ -1,4 +1,5 @@
 schema_version = 1
+mode = "fixed"
 id = "vman"
 display_name = "VMan"
 subtitle = "Shadow of the Last Ninja"

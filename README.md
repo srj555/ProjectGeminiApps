@@ -2,14 +2,15 @@
 
 ProjectGeminiApps is a Kotlin Multiplatform Android/iOS shell for packaging an HTTPS web app as independently branded mobile apps. A validated TOML profile is the only per-app source of truth; the generator derives Android resources and build constants, iOS build settings, schemes, entitlements, and icon sets from it.
 
-The repository currently contains two working examples:
+The repository currently contains two fixed-site examples and one generic launcher:
 
 | Profile | Android ID | iOS bundle ID | Start URL |
 | --- | --- | --- | --- |
 | `duoplay` | `com.duoplay.app` | `com.duoplay.app` | `https://duoplay-589720827506.us-west1.run.app` |
+| `portal` | `com.srj555.portal` | `com.srj555.portal` | Selected and confirmed on first launch |
 | `vman` | `com.vman.app` | `com.vman.app` | `https://v-man-shadow-of-the-last-ninja-589720827506.us-west1.run.app` |
 
-Both profiles have been built as debug APKs and unsigned iOS Simulator apps and smoke-tested on local emulators. That does not make a new profile store-ready by itself: signing, website association files, store metadata/privacy review, real-device coverage, and any site-specific capabilities remain per-app release gates.
+DuoPlay and VMan have been built as debug APKs and unsigned iOS Simulator apps. Portal has also been built as a debug APK and built, Personal-Team signed, installed, and launched on a physical iPhone. That does not make a profile store-ready by itself: signing, store metadata/privacy review, real-device coverage, and site-specific capabilities remain per-app release gates.
 
 ## Quick start
 
@@ -94,6 +95,26 @@ Artifacts are copied to `dist/<profile>/<platform>/`. The wrapper inspects the p
 - Web history is wired to Android system back. Network loss shows a retry surface and reconnect triggers reload.
 - WebView instances are retained across Compose recomposition and disposed with their screen lifecycle.
 - Safe-area insets are applied on both platforms.
+
+Portal uses a separate `launcher` mode rather than weakening the fixed-origin policy used by DuoPlay and VMan. It accepts a typed destination, normalizes a bare hostname to HTTPS, requires an explicit preview/confirmation before the first load, and stores the confirmed URL per installation. It rejects cleartext HTTP, credentials in URLs, and executable/local schemes. Resetting the saved destination keeps website sessions; the separate confirmed “Clear website data” action removes cookies, cache, and website storage.
+
+### Browser capability matrix
+
+| Capability | Fixed profiles | Portal launcher | Qualification |
+| --- | --- | --- | --- |
+| HTTPS pages and redirects | Exact configured origins | Any confirmed HTTPS origin | This is a WebView boundary, not a subresource firewall |
+| Cookies, local storage, service workers | Persistent | Persistent | Kept across URL reset; removed only by explicit website-data clearing |
+| Back/forward history and reload | Yes | Yes | Uses the platform WebView history |
+| Manual URL setup and visible settings | No | Yes | URL changes require preview and confirmation |
+| QR destination scan | No | Pending | The current Portal build labels this unavailable and supports manual entry |
+| Shake-to-open settings | No | Pending | A visible Settings control is always available |
+| File upload/download integration | No | No | Site behavior may vary; no native picker/download manager contract exists |
+| Website camera/microphone | Not guaranteed | Not guaranteed | No native permission mediation has been implemented |
+| OAuth/SSO | Provider-dependent | Provider-dependent | Embedded user agents may be rejected; no system-browser callback specialization |
+| DRM, native payments, passkeys | Not guaranteed | Not guaranteed | Do not assume Safari/Chrome parity or native entitlement support |
+| Native JavaScript bridge | Disabled | Disabled | Sites receive no native privilege channel |
+
+Portal deliberately does not claim Safari or Chrome parity. QR scanning and shake-to-settings remain follow-up capabilities; the shipped core uses manual HTTPS entry plus a visible Settings control.
 
 The origin policy is a top-level navigation boundary, not a network or subresource firewall. Wrapped pages can still request their normal third-party assets; enforce API/content policy with the website's CSP, CORS, authentication, and server controls.
 

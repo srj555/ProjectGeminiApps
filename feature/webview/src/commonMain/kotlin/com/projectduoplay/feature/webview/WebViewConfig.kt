@@ -6,6 +6,7 @@ package com.projectduoplay.feature.webview
 data class WebViewConfig(
     val initialUrl: String,
     val allowedOrigins: List<String>,
+    val allowAnyHttpsOrigin: Boolean = false,
     val enableJavaScript: Boolean = true,
     val enableJavaScriptBridge: Boolean = false,
     val enableDomStorage: Boolean = true,

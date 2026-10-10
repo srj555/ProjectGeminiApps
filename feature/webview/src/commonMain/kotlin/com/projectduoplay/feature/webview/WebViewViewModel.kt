@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.projectduoplay.core.analytics.Analytics
 import com.projectduoplay.core.common.AppConfig
+import com.projectduoplay.core.common.AppMode
 import com.projectduoplay.core.network.NetworkMonitor
 import com.projectduoplay.core.network.NetworkStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,7 @@ class WebViewViewModel(
     val webViewConfig = WebViewConfig(
         initialUrl = appConfig.baseUrl,
         allowedOrigins = appConfig.allowedOrigins,
+        allowAnyHttpsOrigin = appConfig.mode == AppMode.LAUNCHER,
         enableJavaScript = true,
         enableJavaScriptBridge = appConfig.enableJavaScriptBridge,
         enableDomStorage = true,
@@ -47,8 +49,11 @@ class WebViewViewModel(
         observeNetworkStatus()
     }
 
-    fun initializeWebView(controller: WebViewController) {
-        if (::webViewController.isInitialized && webViewController === controller) return
+    fun initializeWebView(controller: WebViewController, initialUrl: String? = null) {
+        if (::webViewController.isInitialized && webViewController === controller) {
+            initialUrl?.takeIf(String::isNotBlank)?.let(controller::loadUrl)
+            return
+        }
 
         webViewController = controller
 
@@ -59,7 +64,8 @@ class WebViewViewModel(
         }
 
         observeWebViewState()
-        controller.loadUrl(pendingDeepLink ?: appConfig.baseUrl)
+        val destination = pendingDeepLink ?: initialUrl ?: appConfig.baseUrl
+        if (destination.isNotBlank()) controller.loadUrl(destination)
         pendingDeepLink = null
     }
 
@@ -121,6 +127,18 @@ class WebViewViewModel(
     fun goBack() {
         if (::webViewController.isInitialized && webViewController.canGoBack.value) {
             webViewController.goBack()
+        }
+    }
+
+    fun goForward() {
+        if (::webViewController.isInitialized && webViewController.canGoForward.value) {
+            webViewController.goForward()
+        }
+    }
+
+    fun clearWebsiteData() {
+        if (::webViewController.isInitialized) {
+            webViewController.clearCache()
         }
     }
 

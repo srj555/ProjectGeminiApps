@@ -28,13 +28,16 @@ PROFILES_DIR = ROOT / "profiles"
 GENERATED_DIR = ROOT / "config" / "generated"
 DIST_DIR = ROOT / "dist"
 SUPPORTED_CAPABILITIES = {
+    "dynamic_https_destination",
     "external_navigation",
     "offline_retry",
     "persistent_session",
+    "settings_reset",
     "web_history",
 }
 TOP_LEVEL_KEYS = {
     "schema_version",
+    "mode",
     "id",
     "display_name",
     "subtitle",
@@ -55,6 +58,13 @@ IOS_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*(?:\.[A-Za-z0-9][A-Za-z0-9-]*)
 SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 URL_SCHEME_RE = re.compile(r"^[a-z][a-z0-9+.-]*$")
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$")
+ANDROID_LEGACY_ICON_SIZES = {
+    "mdpi": 48,
+    "hdpi": 72,
+    "xhdpi": 96,
+    "xxhdpi": 144,
+    "xxxhdpi": 192,
+}
 
 
 class ProfileError(ValueError):
@@ -126,13 +136,18 @@ def validate_plain_text(value: str, field: str) -> None:
         fail(f"{field} contains characters unsafe for generated build settings")
 
 
-def validate_png(path: Path, field: str) -> None:
+def png_metadata(path: Path, field: str) -> tuple[int, int, int]:
     if not path.is_file():
         fail(f"{field} does not exist: {path}")
     data = path.read_bytes()[:33]
     if len(data) < 33 or data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
         fail(f"{field} must be a PNG")
     width, height, _, color_type = struct.unpack(">IIBB", data[16:26])
+    return width, height, color_type
+
+
+def validate_png(path: Path, field: str) -> None:
+    width, height, color_type = png_metadata(path, field)
     if (width, height) != (1024, 1024):
         fail(f"{field} must be exactly 1024x1024")
     if color_type not in (0, 2, 3):
@@ -150,6 +165,42 @@ def validated_icon_path(raw: str, profile_id: str) -> Path:
         fail(f"{profile_id}.icon must stay inside profiles/icons")
     validate_png(resolved, f"{profile_id}.icon")
     return resolved
+
+
+def validated_android_icon_resources(profile_id: str) -> Path:
+    resources = (PROFILES_DIR / "android" / profile_id / "res").resolve()
+    android_root = (PROFILES_DIR / "android").resolve()
+    if android_root not in resources.parents or not resources.is_dir():
+        fail(f"{profile_id} is missing profiles/android/{profile_id}/res")
+
+    xml_roots = {
+        "drawable/ic_launcher_foreground.xml": "vector",
+        "drawable/ic_launcher_monochrome.xml": "vector",
+        "mipmap-anydpi-v26/ic_launcher.xml": "adaptive-icon",
+        "mipmap-anydpi-v26/ic_launcher_round.xml": "adaptive-icon",
+        "values/ic_launcher_background.xml": "resources",
+    }
+    for relative, expected_root in xml_roots.items():
+        path = resources / relative
+        if not path.is_file() or path.is_symlink():
+            fail(f"{profile_id} is missing Android icon resource {relative}")
+        try:
+            root = ElementTree.parse(path).getroot().tag.rsplit("}", 1)[-1]
+        except (ElementTree.ParseError, OSError) as error:
+            fail(f"{profile_id} Android icon resource {relative} is invalid: {error}")
+        if root != expected_root:
+            fail(f"{profile_id} Android icon resource {relative} must contain {expected_root}")
+
+    for density, size in ANDROID_LEGACY_ICON_SIZES.items():
+        for filename in ("ic_launcher.png", "ic_launcher_round.png"):
+            relative = f"mipmap-{density}/{filename}"
+            path = resources / relative
+            width, height, color_type = png_metadata(path, f"{profile_id} Android icon {relative}")
+            if (width, height) != (size, size):
+                fail(f"{profile_id} Android icon {relative} must be exactly {size}x{size}")
+            if color_type not in (0, 2, 3):
+                fail(f"{profile_id} Android icon {relative} must not contain an alpha channel")
+    return resources
 
 
 def load_profiles() -> dict[str, dict[str, Any]]:
@@ -190,8 +241,10 @@ def load_profiles() -> dict[str, dict[str, Any]]:
 
         if profile["schema_version"] != 1:
             fail(f"{profile_id}.schema_version must be 1")
-        for field in ("display_name", "subtitle", "start_url", "icon", "version_name"):
+        for field in ("mode", "display_name", "subtitle", "start_url", "icon", "version_name"):
             require_type(profile[field], str, f"{profile_id}.{field}")
+        if profile["mode"] not in ("fixed", "launcher"):
+            fail(f"{profile_id}.mode must be fixed or launcher")
         validate_plain_text(profile["display_name"], f"{profile_id}.display_name")
         validate_plain_text(profile["subtitle"], "subtitle")
         if not VERSION_RE.fullmatch(profile["version_name"]):
@@ -201,15 +254,20 @@ def load_profiles() -> dict[str, dict[str, Any]]:
             fail(f"{profile_id}.version_code must be positive")
 
         require_type(profile["allowed_origins"], list, f"{profile_id}.allowed_origins")
-        if not profile["allowed_origins"]:
-            fail(f"{profile_id}.allowed_origins must not be empty")
+        if profile["mode"] == "fixed" and not profile["allowed_origins"]:
+            fail(f"{profile_id}.allowed_origins must not be empty for fixed mode")
+        if profile["mode"] == "launcher" and (profile["start_url"] or profile["allowed_origins"]):
+            fail(f"{profile_id} launcher mode must start without a URL or fixed origins")
         origins = [canonical_origin(item, f"{profile_id}.allowed_origins") for item in profile["allowed_origins"]]
         if len(origins) != len(set(origins)):
             fail(f"{profile_id}.allowed_origins contains duplicates after normalization")
         profile["allowed_origins"] = origins
-        profile["start_url_origin"] = start_url_origin(profile["start_url"], f"{profile_id}.start_url")
-        if profile["start_url_origin"] not in origins:
-            fail(f"{profile_id}.start_url origin is not allowlisted")
+        if profile["mode"] == "fixed":
+            profile["start_url_origin"] = start_url_origin(profile["start_url"], f"{profile_id}.start_url")
+            if profile["start_url_origin"] not in origins:
+                fail(f"{profile_id}.start_url origin is not allowlisted")
+        else:
+            profile["start_url_origin"] = ""
 
         require_type(profile["required_capabilities"], list, f"{profile_id}.required_capabilities")
         if not all(isinstance(item, str) for item in profile["required_capabilities"]):
@@ -218,6 +276,7 @@ def load_profiles() -> dict[str, dict[str, Any]]:
         if unsupported:
             fail(f"{profile_id} requests unsupported capabilities: {', '.join(sorted(unsupported))}")
         profile["icon_path"] = validated_icon_path(profile["icon"], profile_id)
+        profile["android_icon_resources"] = validated_android_icon_resources(profile_id)
 
         for section, allowed_keys in (("android", ANDROID_KEYS), ("ios", IOS_KEYS)):
             require_type(profile[section], dict, f"{profile_id}.{section}")
@@ -242,8 +301,12 @@ def load_profiles() -> dict[str, dict[str, Any]]:
             fail(f"{profile_id}.ios.scheme is invalid")
         if not isinstance(url_scheme, str) or not URL_SCHEME_RE.fullmatch(url_scheme):
             fail(f"{profile_id}.ios.url_scheme is invalid")
-        if not isinstance(associated_domain, str) or associated_domain != urlsplit(profile["start_url"]).hostname:
+        if not isinstance(associated_domain, str):
+            fail(f"{profile_id}.ios.associated_domain is invalid")
+        if profile["mode"] == "fixed" and associated_domain != urlsplit(profile["start_url"]).hostname:
             fail(f"{profile_id}.ios.associated_domain must match the start URL host")
+        if profile["mode"] == "launcher" and associated_domain:
+            fail(f"{profile_id}.ios.associated_domain must be empty for launcher mode")
 
         for value, registry, label in (
             (android_id.lower(), android_ids, "Android application id"),
@@ -283,6 +346,7 @@ def generate_android(profile: dict[str, Any]) -> None:
     destination = GENERATED_DIR / "profiles" / profile_id
     values = {
         "profile.id": profile_id,
+        "app.mode": profile["mode"],
         "app.name": profile["display_name"],
         "app.subtitle": profile["subtitle"],
         "app.startUrl": profile["start_url"],
@@ -291,14 +355,14 @@ def generate_android(profile: dict[str, Any]) -> None:
         "app.versionName": profile["version_name"],
         "app.versionCode": profile["version_code"],
         "android.applicationId": profile["android"]["application_id"],
-        "android.deepLinkHost": urlsplit(profile["start_url"]).hostname or "",
+        "android.deepLinkHost": urlsplit(profile["start_url"]).hostname or "disabled.invalid",
     }
     content = "# Generated from profiles/%s.toml; do not edit.\n" % profile_id
     content += "".join(f"{key}={java_property(value)}\n" for key, value in sorted(values.items()))
     atomic_write(destination / "android.properties", content)
-    icon = profile["icon_path"].read_bytes()
-    atomic_write(destination / "android" / "res" / "mipmap-xxxhdpi" / "ic_launcher.png", icon)
-    atomic_write(destination / "android" / "res" / "mipmap-xxxhdpi" / "ic_launcher_round.png", icon)
+    resource_destination = destination / "android" / "res"
+    shutil.rmtree(resource_destination, ignore_errors=True)
+    shutil.copytree(profile["android_icon_resources"], resource_destination)
 
 
 def generate_ios_config(profile: dict[str, Any]) -> None:
@@ -310,6 +374,7 @@ def generate_ios_config(profile: dict[str, Any]) -> None:
 
 APP_NAME = {profile['display_name']}
 APP_SUBTITLE = {profile['subtitle']}
+APP_MODE = {profile['mode']}
 APP_BUNDLE_ID = {profile['ios']['bundle_id']}
 PRODUCT_BUNDLE_IDENTIFIER = $(APP_BUNDLE_ID)
 APP_URL_SCHEME = {profile['ios']['url_scheme']}
@@ -370,7 +435,6 @@ def generate_xcode_project(profiles: dict[str, dict[str, Any]]) -> None:
         "      - sdk: WebKit.framework",
         "    settings:",
         "      base:",
-        "        CODE_SIGN_ENTITLEMENTS: iosApp/iosApp.entitlements",
         "        GENERATE_INFOPLIST_FILE: NO",
         "        INFOPLIST_FILE: iosApp/Info.plist",
         '        PRODUCT_NAME: "$(APP_NAME)"',
@@ -385,6 +449,13 @@ def generate_xcode_project(profiles: dict[str, dict[str, Any]]) -> None:
             f"  {scheme}:",
             "    templates:",
             "      - WebWrapperApp",
+            "    settings:",
+            "      base:",
+            (
+                "        CODE_SIGN_ENTITLEMENTS: iosApp/iosApp.entitlements"
+                if profile["mode"] == "fixed"
+                else '        CODE_SIGN_ENTITLEMENTS: ""'
+            ),
             "    configFiles:",
             f"      Debug: Config/Generated/{profile_id}-Debug.xcconfig",
             f"      Release: Config/Generated/{profile_id}-Release.xcconfig",
@@ -454,7 +525,10 @@ def generate(profiles: dict[str, dict[str, Any]], selected: str, platform: str) 
             "profiles": sorted(profiles),
             "schema_version": 1,
             "source_hash": hashlib.sha256(
-                b"".join(path.read_bytes() for path in sorted(PROFILES_DIR.glob("*.toml")))
+                b"".join(
+                    path.relative_to(PROFILES_DIR).as_posix().encode() + b"\0" + path.read_bytes()
+                    for path in sorted(item for item in PROFILES_DIR.rglob("*") if item.is_file())
+                )
             ).hexdigest(),
         }
         atomic_write(GENERATED_DIR / "manifest.json", json.dumps(manifest, indent=2) + "\n")

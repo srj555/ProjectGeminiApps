@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import platform.Foundation.NSError
+import platform.Foundation.NSDate
 import platform.Foundation.NSURL
 import platform.Foundation.NSURLRequest
 import platform.WebKit.WKNavigation
@@ -16,6 +17,7 @@ import platform.WebKit.WKScriptMessageHandlerProtocol
 import platform.WebKit.WKUserContentController
 import platform.WebKit.WKWebView
 import platform.WebKit.WKWebViewConfiguration
+import platform.WebKit.WKWebsiteDataStore
 import platform.UIKit.UIApplication
 import platform.darwin.NSObject
 
@@ -39,7 +41,10 @@ actual class PlatformWebViewController actual constructor(
     private var messageHandler: ((JavaScriptMessage) -> Unit)? = null
     private var scriptMessageHandler: WKScriptMessageHandlerProtocol? = null
     private var navigationDelegate: WKNavigationDelegateProtocol? = null
-    private val navigationPolicy = NavigationPolicy(config.allowedOrigins)
+    private val navigationPolicy = NavigationPolicy(
+        config.allowedOrigins,
+        config.allowAnyHttpsOrigin
+    )
     var webView: WKWebView? = null
         private set
 
@@ -69,6 +74,7 @@ actual class PlatformWebViewController actual constructor(
 
         configuration.userContentController = userContentController
         configuration.allowsInlineMediaPlayback = true
+        configuration.websiteDataStore = WKWebsiteDataStore.defaultDataStore()
         config.userAgentSuffix?.let { suffix ->
             configuration.applicationNameForUserAgent = suffix
         }
@@ -190,8 +196,10 @@ actual class PlatformWebViewController actual constructor(
     }
 
     override fun clearCache() {
-        // iOS WebView cache clearing would go here
-        // WKWebsiteDataStore.defaultDataStore().removeDataOfTypes(...)
+        WKWebsiteDataStore.defaultDataStore().removeDataOfTypes(
+            WKWebsiteDataStore.allWebsiteDataTypes(),
+            NSDate(timeIntervalSinceReferenceDate = -978307200.0)
+        ) {}
     }
 
     override fun dispose() {

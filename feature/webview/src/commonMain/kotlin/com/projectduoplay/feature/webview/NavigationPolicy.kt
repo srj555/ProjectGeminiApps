@@ -12,23 +12,25 @@ enum class NavigationDecision {
  * Applies one origin policy to initial loads, redirects, deep links and bridge navigation.
  * Only exact HTTPS origins are eligible for loading inside the app.
  */
-class NavigationPolicy(allowedOrigins: List<String>) {
+class NavigationPolicy(
+    allowedOrigins: List<String>,
+    private val allowAnyHttpsOrigin: Boolean = false
+) {
     private val allowedOrigins = allowedOrigins.mapNotNull(::parseHttpsOrigin).toSet()
 
     fun decide(rawUrl: String): NavigationDecision {
         val scheme = rawUrl.substringBefore(':', missingDelimiterValue = "").lowercase()
+        if (scheme == "http") {
+            return if (allowAnyHttpsOrigin) NavigationDecision.BLOCK else NavigationDecision.OPEN_EXTERNALLY
+        }
         if (scheme in EXTERNAL_SCHEMES && scheme != "https") {
             return NavigationDecision.OPEN_EXTERNALLY
         }
 
         val origin = parseHttpsOrigin(rawUrl)
-            ?: return if (scheme == "http") {
-                NavigationDecision.OPEN_EXTERNALLY
-            } else {
-                NavigationDecision.BLOCK
-            }
+            ?: return NavigationDecision.BLOCK
 
-        return if (origin in allowedOrigins) {
+        return if (allowAnyHttpsOrigin || origin in allowedOrigins) {
             NavigationDecision.ALLOW_IN_WEB_VIEW
         } else {
             NavigationDecision.OPEN_EXTERNALLY

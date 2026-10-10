@@ -72,6 +72,8 @@
     <string>$(APP_NAME)</string>
     <key>AppSubtitle</key>
     <string>$(APP_SUBTITLE)</string>
+    <key>AppMode</key>
+    <string>$(APP_MODE)</string>
     <key>AppStartURL</key>
     <string>$(APP_START_URL)</string>
     <key>AppAllowedOrigins</key>

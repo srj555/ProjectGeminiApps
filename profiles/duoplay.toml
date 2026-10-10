@@ -1,4 +1,5 @@
 schema_version = 1
+mode = "fixed"
 id = "duoplay"
 display_name = "DuoPlay"
 subtitle = ""

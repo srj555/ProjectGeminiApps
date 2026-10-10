@@ -6,12 +6,14 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.webkit.JavascriptInterface
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebStorage
 import java.io.ByteArrayInputStream
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +37,10 @@ actual class PlatformWebViewController actual constructor(
 
     private var messageHandler: ((JavaScriptMessage) -> Unit)? = null
     private var webView: WebView? = null
-    private val navigationPolicy = NavigationPolicy(config.allowedOrigins)
+    private val navigationPolicy = NavigationPolicy(
+        config.allowedOrigins,
+        config.allowAnyHttpsOrigin
+    )
 
     @SuppressLint("SetJavaScriptEnabled")
     fun setupWebView(webView: WebView) {
@@ -78,6 +83,11 @@ actual class PlatformWebViewController actual constructor(
             } else {
                 android.webkit.WebSettings.LOAD_NO_CACHE
             }
+        }
+
+        CookieManager.getInstance().apply {
+            setAcceptCookie(true)
+            setAcceptThirdPartyCookies(webView, true)
         }
 
         webView.webViewClient = createWebViewClient()
@@ -225,7 +235,15 @@ actual class PlatformWebViewController actual constructor(
     }
 
     override fun clearCache() {
-        webView?.clearCache(true)
+        CookieManager.getInstance().apply {
+            removeAllCookies(null)
+            flush()
+        }
+        WebStorage.getInstance().deleteAllData()
+        webView?.apply {
+            clearCache(true)
+            clearHistory()
+        }
     }
 
     override fun dispose() {
