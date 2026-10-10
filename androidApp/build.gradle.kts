@@ -1,5 +1,4 @@
 import java.util.Properties
-import java.io.FileInputStream
 
 plugins {
     alias(libs.plugins.androidApplication)
@@ -23,7 +22,7 @@ if (!profilePropertiesFile.isFile) {
     )
 }
 val profileProperties = Properties().apply {
-    profilePropertiesFile.inputStream().use(::load)
+    profilePropertiesFile.reader(Charsets.UTF_8).use(::load)
 }
 fun profileValue(key: String): String = profileProperties.getProperty(key)
     ?: throw GradleException("Generated profile $appProfileId is missing $key")
@@ -78,13 +77,27 @@ android {
     val keystorePropertiesFile = rootProject.file("keystore.properties")
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
-        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+        keystorePropertiesFile.reader(Charsets.UTF_8).use(keystoreProperties::load)
+    }
+    val releaseTaskRequested = gradle.startParameter.taskNames.any {
+        it.contains("Release", ignoreCase = true)
+    }
+    val signingKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    val hasSigningValues = signingKeys.all { !keystoreProperties.getProperty(it).isNullOrBlank() }
+    val releaseStoreFile = keystoreProperties.getProperty("storeFile")
+        ?.let(rootProject::file)
+    val hasReleaseSigning = hasSigningValues && releaseStoreFile?.isFile == true
+    if (releaseTaskRequested && !hasReleaseSigning) {
+        throw GradleException(
+            "Android release tasks require keystore.properties with storeFile, storePassword, " +
+                "keyAlias, and keyPassword resolving to a real signing key"
+        )
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        if (hasReleaseSigning) {
             create("release") {
-                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storeFile = releaseStoreFile
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
@@ -96,7 +109,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            if (keystorePropertiesFile.exists()) {
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
             proguardFiles(

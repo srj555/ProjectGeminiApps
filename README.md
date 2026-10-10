@@ -13,7 +13,7 @@ Both profiles have been built as debug APKs and unsigned iOS Simulator apps and 
 
 ## Quick start
 
-Requirements are JDK 17, Python 3.11+, Android SDK/ADB for Android, and Xcode, XcodeGen, and CocoaPods for iOS.
+Requirements are JDK 17, Python 3.11+, Android SDK/ADB for Android, and Xcode, XcodeGen, and CocoaPods for iOS. AAB builds additionally require `bundletool` so the packaged manifest can be inspected with the format's supported tooling before success is reported.
 
 ```bash
 ./wrapper doctor --platform android
@@ -81,18 +81,21 @@ Validation fails closed on unknown fields, duplicate app IDs/bundle IDs/schemes,
 | iOS | Device archive | `xcarchive` | Generated with code signing disabled; not distributable |
 | iOS | IPA | `ipa` | Intentionally rejected until an Apple-signed archive and export options are supplied |
 
-Artifacts are copied to `dist/<profile>/<platform>/`. The wrapper inspects the packaged Android application ID and iOS bundle/profile fields before reporting success. It never falls back to Android debug signing for a release build.
+Artifacts are copied to `dist/<profile>/<platform>/`. The wrapper inspects the packaged Android application ID and signature and the iOS bundle/profile fields before reporting success. APK verification uses Android SDK tools; AAB verification uses `bundletool` plus `jarsigner`. Android release commands fail before Gradle unless a complete ignored signing configuration resolves to a real keystore, and they never fall back to debug signing.
 
 ## Runtime behavior and security
 
 - Android uses `WebView`; iOS uses `WKWebView`.
 - Only exact canonical HTTPS origins in `allowed_origins` stay inside the app. Host suffix lookalikes and cleartext URLs are not allowed.
 - Main-frame HTTP(S), `mailto:`, and `tel:` destinations outside the allowlist are delegated to the operating system when reached through web navigation; unsafe schemes are blocked.
+- Cross-origin subframes are cancelled instead of being allowed to launch the system browser. Android also applies a main-frame request fallback for POST navigations, which are not delivered to the normal navigation override callback.
 - Android file/content access and mixed content are disabled; safe browsing is enabled.
 - The native JavaScript bridge is disabled by generated profiles. JavaScript remains enabled because the wrapped sites require it.
 - Web history is wired to Android system back. Network loss shows a retry surface and reconnect triggers reload.
 - WebView instances are retained across Compose recomposition and disposed with their screen lifecycle.
 - Safe-area insets are applied on both platforms.
+
+The origin policy is a top-level navigation boundary, not a network or subresource firewall. Wrapped pages can still request their normal third-party assets; enforce API/content policy with the website's CSP, CORS, authentication, and server controls.
 
 OAuth redirects, file upload/download handling, camera/microphone permissions, push notifications, a native bridge API, certificate pinning, and analytics SDK integration are **not** implemented capabilities. The profile validator rejects capabilities outside the currently supported set instead of silently producing a partially working app.
 

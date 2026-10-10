@@ -9,8 +9,10 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import java.io.ByteArrayInputStream
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -138,6 +140,37 @@ actual class PlatformWebViewController actual constructor(
                 }
                 NavigationDecision.BLOCK -> true
             }
+        }
+
+        override fun shouldInterceptRequest(
+            view: WebView?,
+            request: WebResourceRequest?
+        ): WebResourceResponse? {
+            val url = request?.url?.toString() ?: return super.shouldInterceptRequest(view, request)
+
+            // shouldOverrideUrlLoading is not invoked for POST. This request-level fallback
+            // enforces the origin boundary for main-frame loads only; it is not a subresource
+            // firewall and deliberately leaves normal page assets alone.
+            if (!navigationPolicy.shouldBlockMainFrameRequest(url, request.isForMainFrame)) {
+                return super.shouldInterceptRequest(view, request)
+            }
+
+            view?.post {
+                _currentUrl.value = url
+                _loadingState.value = WebViewLoadingState.Error(
+                    errorCode = ERROR_BLOCKED_NAVIGATION,
+                    description = "This main-frame request is not allowed inside the app.",
+                    failingUrl = url
+                )
+            }
+            return WebResourceResponse(
+                "text/plain",
+                "UTF-8",
+                403,
+                "Blocked by app navigation policy",
+                mapOf("Cache-Control" to "no-store"),
+                ByteArrayInputStream("Blocked by app navigation policy".encodeToByteArray())
+            )
         }
     }
 

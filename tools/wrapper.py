@@ -20,6 +20,7 @@ import time
 import tomllib
 from typing import Any
 from urllib.parse import urlsplit
+import xml.etree.ElementTree as ElementTree
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -482,8 +483,70 @@ def environment() -> dict[str, str]:
     return env
 
 
+def resolve_android_artifact(build_root: Path, configuration: str, artifact: str) -> Path:
+    artifact_directory = "apk" if artifact == "apk" else "bundle"
+    variant_directory = build_root / artifact_directory / configuration
+    candidates = sorted(variant_directory.glob(f"*.{artifact}"))
+    if not candidates:
+        fail(
+            f"Gradle completed without a {configuration} {artifact} artifact in "
+            f"{variant_directory}"
+        )
+    if len(candidates) != 1:
+        fail(
+            f"Gradle produced multiple {configuration} {artifact} artifacts in "
+            f"{variant_directory}; split artifacts are not supported"
+        )
+    return candidates[0]
+
+
+def resolve_ios_simulator_app(
+    products_root: Path,
+    configuration: str,
+    display_name: str,
+) -> Path:
+    app = products_root / f"{configuration.capitalize()}-iphonesimulator" / f"{display_name}.app"
+    if not app.is_dir():
+        fail(f"Xcode completed without the requested simulator app at {app}")
+    return app
+
+
+def read_simple_properties(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith(("#", "!")):
+            continue
+        separator = "=" if "=" in line else ":" if ":" in line else None
+        if separator is None:
+            continue
+        key, value = line.split(separator, 1)
+        values[key.strip()] = value.strip()
+    return values
+
+
+def require_android_release_signing(root: Path = ROOT) -> Path:
+    properties_path = root / "keystore.properties"
+    if not properties_path.is_file():
+        fail("Android release builds require an ignored keystore.properties file")
+    values = read_simple_properties(properties_path)
+    required = ("storeFile", "storePassword", "keyAlias", "keyPassword")
+    missing = [key for key in required if not values.get(key)]
+    if missing:
+        fail(f"keystore.properties is missing required signing fields: {', '.join(missing)}")
+    store_file = Path(values["storeFile"])
+    if not store_file.is_absolute():
+        store_file = root / store_file
+    if not store_file.is_file():
+        fail("keystore.properties storeFile does not resolve to a real signing key")
+    print("Verified Android release signing configuration")
+    return store_file
+
+
 def build_android(profile: dict[str, Any], configuration: str, artifact: str) -> Path:
     profile_id = profile["id"]
+    if configuration == "release":
+        require_android_release_signing()
     task = "assemble" if artifact == "apk" else "bundle"
     task += configuration.capitalize()
     run(
@@ -492,30 +555,66 @@ def build_android(profile: dict[str, Any], configuration: str, artifact: str) ->
     )
     extension = artifact
     build_root = ROOT / ".build" / "android" / profile_id / "androidApp" / "outputs"
-    candidates = sorted(build_root.rglob(f"*.{extension}"), key=lambda item: item.stat().st_mtime)
-    if not candidates:
-        fail(f"Gradle completed without a {artifact} artifact")
-    source = candidates[-1]
+    source = resolve_android_artifact(build_root, configuration, artifact)
     destination = DIST_DIR / profile_id / "android" / f"{profile_id}-{configuration}.{extension}"
     atomic_write(destination, source.read_bytes())
-    inspect_android_artifact(destination, profile)
+    inspect_android_artifact(destination, profile, configuration, artifact)
     return destination
 
 
-def inspect_android_artifact(path: Path, profile: dict[str, Any]) -> None:
-    sdk = Path(environment().get("ANDROID_HOME", ""))
-    analyzers = sorted(sdk.glob("cmdline-tools/*/bin/apkanalyzer"))
-    if not analyzers:
-        print("WARN: apkanalyzer unavailable; packaged identity inspection skipped")
-        return
-    analyzer = str(analyzers[-1])
-    packaged_id = output([analyzer, "manifest", "application-id", str(path)])
+def inspect_android_artifact(
+    path: Path,
+    profile: dict[str, Any],
+    configuration: str,
+    artifact: str,
+) -> None:
+    env = environment()
+    if artifact == "apk":
+        sdk = Path(env.get("ANDROID_HOME", ""))
+        analyzers = sorted(sdk.glob("cmdline-tools/*/bin/apkanalyzer"))
+        if not analyzers:
+            fail("apkanalyzer is required to inspect packaged APK identity")
+        packaged_id = output([
+            str(analyzers[-1]),
+            "manifest",
+            "application-id",
+            str(path),
+        ], env=env)
+        signers = sorted(sdk.glob("build-tools/*/apksigner"))
+        if not signers:
+            fail("apksigner is required to verify packaged APK signing")
+        run([str(signers[-1]), "verify", "--verbose", str(path)], env=env)
+    elif artifact == "aab":
+        bundletool = shutil.which("bundletool", path=env.get("PATH"))
+        if not bundletool:
+            fail("bundletool is required to inspect packaged AAB identity")
+        manifest = output([
+            bundletool,
+            "dump",
+            "manifest",
+            f"--bundle={path}",
+            "--module=base",
+        ], env=env)
+        try:
+            packaged_id = ElementTree.fromstring(manifest).attrib["package"]
+        except (ElementTree.ParseError, KeyError) as error:
+            fail(f"Unable to read application id from AAB manifest: {error}")
+        jarsigner = shutil.which("jarsigner", path=env.get("PATH"))
+        if not jarsigner:
+            fail("jarsigner is required to verify packaged AAB signing")
+        verification = output([jarsigner, "-verify", str(path)], env=env)
+        if "jar verified." not in verification.lower():
+            fail("jarsigner did not confirm a valid AAB signature")
+    else:
+        fail(f"Unsupported Android artifact inspection type: {artifact}")
+
     expected = profile["android"]["application_id"]
-    if path.name.endswith("-debug.apk"):
+    if configuration == "debug":
         expected += ".debug"
     if packaged_id != expected:
         fail(f"Packaged Android id {packaged_id!r} does not match {expected!r}")
     print(f"Verified packaged Android application id: {packaged_id}")
+    print(f"Verified packaged Android {artifact.upper()} signature")
 
 
 def prepare_ios(profiles: dict[str, dict[str, Any]]) -> None:
@@ -542,14 +641,16 @@ def build_ios(profile: dict[str, Any], configuration: str, artifact: str) -> Pat
     ]
     if artifact == "simulator-app":
         run(base + ["-sdk", "iphonesimulator", "CODE_SIGNING_ALLOWED=NO", "build"], env=environment())
-        candidates = sorted((derived / "Build" / "Products").rglob(f"{profile['display_name']}.app"))
-        if not candidates:
-            fail("Xcode completed without a simulator app")
+        source = resolve_ios_simulator_app(
+            derived / "Build" / "Products",
+            configuration,
+            profile["display_name"],
+        )
         destination = DIST_DIR / profile_id / "ios" / f"{scheme}-simulator.app"
         if destination.exists():
             shutil.rmtree(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(candidates[-1], destination)
+        shutil.copytree(source, destination)
         inspect_ios_app(destination, profile)
         return destination
     if artifact == "xcarchive":

@@ -49,6 +49,7 @@ python3 -m unittest tools.tests.test_wrapper.GeneratorIntegrationTest -v
 ### Android
 
 - Supply an ignored `keystore.properties` file and keystore using the existing local release-signing convention.
+- Install `bundletool` before producing an AAB; the wrapper fails rather than claiming packaged identity verification without it.
 - Build `apk` for device testing and `aab` for Play distribution.
 - Verify the packaged application ID/version and test the release build.
 - Complete Play target-SDK, data-safety, content-rating, privacy-policy, and account requirements.

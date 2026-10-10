@@ -38,6 +38,7 @@ actual class PlatformWebViewController actual constructor(
 
     private var messageHandler: ((JavaScriptMessage) -> Unit)? = null
     private var scriptMessageHandler: WKScriptMessageHandlerProtocol? = null
+    private var navigationDelegate: WKNavigationDelegateProtocol? = null
     private val navigationPolicy = NavigationPolicy(config.allowedOrigins)
     var webView: WKWebView? = null
         private set
@@ -68,13 +69,16 @@ actual class PlatformWebViewController actual constructor(
 
         configuration.userContentController = userContentController
         configuration.allowsInlineMediaPlayback = true
+        config.userAgentSuffix?.let { suffix ->
+            configuration.applicationNameForUserAgent = suffix
+        }
 
         val webView = WKWebView(
             frame = platform.CoreGraphics.CGRectMake(0.0, 0.0, 0.0, 0.0),
             configuration = configuration
         )
 
-        webView.navigationDelegate = object : NSObject(), WKNavigationDelegateProtocol {
+        navigationDelegate = object : NSObject(), WKNavigationDelegateProtocol {
             override fun webView(
                 webView: WKWebView,
                 didStartProvisionalNavigation: WKNavigation?
@@ -113,8 +117,9 @@ actual class PlatformWebViewController actual constructor(
                 decisionHandler: (WKNavigationActionPolicy) -> Unit
             ) {
                 val url = decidePolicyForNavigationAction.request.URL?.absoluteString ?: ""
+                val isMainFrame = decidePolicyForNavigationAction.targetFrame?.mainFrame ?: true
 
-                when (navigationPolicy.decide(url)) {
+                when (navigationPolicy.decideForFrame(url, isMainFrame)) {
                     NavigationDecision.ALLOW_IN_WEB_VIEW -> {
                         if (decidePolicyForNavigationAction.targetFrame == null) {
                             webView.loadRequest(decidePolicyForNavigationAction.request)
@@ -133,13 +138,10 @@ actual class PlatformWebViewController actual constructor(
                 }
             }
         }
+        webView.navigationDelegate = navigationDelegate
 
         // Configure WebView settings
         webView.allowsBackForwardNavigationGestures = true
-
-        config.userAgentSuffix?.let { suffix ->
-            webView.customUserAgent = "${webView.customUserAgent ?: ""} $suffix"
-        }
 
         this.webView = webView
         return webView
@@ -198,6 +200,7 @@ actual class PlatformWebViewController actual constructor(
         webView?.configuration?.userContentController
             ?.removeScriptMessageHandlerForName(config.javaScriptBridgeName)
         webView = null
+        navigationDelegate = null
         scriptMessageHandler = null
         messageHandler = null
     }

@@ -35,6 +35,26 @@ class NavigationPolicy(allowedOrigins: List<String>) {
         }
     }
 
+    /**
+     * Subframes may load only allowlisted origins and must never open another app or browser.
+     * A missing target frame is treated as a main-frame/new-window navigation by callers.
+     */
+    fun decideForFrame(rawUrl: String, isMainFrame: Boolean): NavigationDecision {
+        val decision = decide(rawUrl)
+        return if (!isMainFrame && decision == NavigationDecision.OPEN_EXTERNALLY) {
+            NavigationDecision.BLOCK
+        } else {
+            decision
+        }
+    }
+
+    /**
+     * Defensive main-frame request check for platform callbacks that also observe POST loads.
+     * This intentionally does not claim to be a subresource firewall.
+     */
+    fun shouldBlockMainFrameRequest(rawUrl: String, isMainFrame: Boolean): Boolean =
+        isMainFrame && decide(rawUrl) != NavigationDecision.ALLOW_IN_WEB_VIEW
+
     private fun parseHttpsOrigin(rawUrl: String): WebOrigin? {
         if (!rawUrl.startsWith("https://", ignoreCase = true)) return null
 
